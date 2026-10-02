@@ -1,0 +1,153 @@
+/**
+ * Stage 8 — History server functions. Two durable logs, both RLS-scoped to
+ * the signed-in user: agent/action runs (`agent_runs`, written by
+ * `history.server.ts` right after each `runWorkflow`) and conversation
+ * turns (`chat_turns`, written by the chat panel as each reply finishes).
+ */
+import { createServerFn } from "@tanstack/react-start";
+import { z } from "zod";
+
+import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
+import type { Plan, StepResult, VerificationReport } from "@/lib/agents";
+
+export type AgentRunSummary = {
+  id: string;
+  goal: string;
+  status: string;
+  answer: string;
+  verification_verdict: string | null;
+  verification_score: number | null;
+  step_count: number;
+  failed_count: number;
+  automation_id: string | null;
+  created_at: string;
+};
+
+export type AgentRunDetail = AgentRunSummary & {
+  plan: Plan;
+  steps: StepResult[];
+  verification: VerificationReport;
+};
+
+const ListAgentRunsInput = z.object({
+  search: z.string().trim().max(200).default(""),
+  status: z.enum(["all", "verified", "partial", "failed"]).default("all"),
+  limit: z.number().int().min(1).max(100).default(30),
+});
+
+export const listAgentRuns = createServerFn({ method: "GET" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((input: unknown) => ListAgentRunsInput.parse(input ?? {}))
+  .handler(async ({ data, context }): Promise<AgentRunSummary[]> => {
+    let query = context.supabase
+      .from("agent_runs")
+      .select(
+        "id,goal,status,answer,verification_verdict,verification_score,step_count,failed_count,automation_id,created_at",
+      )
+      .order("created_at", { ascending: false })
+      .limit(data.limit);
+    if (data.status !== "all") query = query.eq("status", data.status);
+    if (data.search) query = query.ilike("goal", `%${data.search}%`);
+    const { data: rows, error } = await query;
+    if (error) throw new Error(error.message);
+    return (rows ?? []) as AgentRunSummary[];
+  });
+
+export const getAgentRun = createServerFn({ method: "GET" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((input: unknown) => z.object({ runId: z.string().min(1) }).parse(input))
+  .handler(async ({ data, context }): Promise<AgentRunDetail | null> => {
+    const { data: row, error } = await context.supabase
+      .from("agent_runs")
+      .select("*")
+      .eq("id", data.runId)
+      .maybeSingle();
+    if (error) throw new Error(error.message);
+    if (!row) return null;
+    return row as unknown as AgentRunDetail;
+  });
+
+export const deleteAgentRun = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((input: unknown) => z.object({ runId: z.string().min(1) }).parse(input))
+  .handler(async ({ data, context }): Promise<{ ok: true }> => {
+    const { error } = await context.supabase.from("agent_runs").delete().eq("id", data.runId);
+    if (error) throw new Error(error.message);
+    return { ok: true };
+  });
+
+/* ------------------------------------------------------------------ */
+/* Conversation history                                                 */
+/* ------------------------------------------------------------------ */
+
+export type ChatTurnRecord = {
+  id: string;
+  role: "user" | "assistant";
+  content: string;
+  page_title: string | null;
+  page_url: string | null;
+  created_at: string;
+};
+
+const RecordChatTurnInput = z.object({
+  role: z.enum(["user", "assistant"]),
+  content: z.string().trim().min(1).max(20_000),
+  pageTitle: z.string().trim().max(300).nullable().default(null),
+  pageUrl: z.string().trim().max(2000).nullable().default(null),
+});
+
+/** Append one turn. Called best-effort from the chat panel; never blocks the live reply. */
+export const recordChatTurn = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((input: unknown) => RecordChatTurnInput.parse(input))
+  .handler(async ({ data, context }): Promise<{ ok: true }> => {
+    const { error } = await context.supabase.from("chat_turns").insert({
+      user_id: context.userId,
+      role: data.role,
+      content: data.content,
+      page_title: data.pageTitle,
+      page_url: data.pageUrl,
+    });
+    if (error) throw new Error(error.message);
+    return { ok: true };
+  });
+
+const ListChatHistoryInput = z.object({
+  search: z.string().trim().max(200).default(""),
+  limit: z.number().int().min(1).max(200).default(60),
+});
+
+export const listChatHistory = createServerFn({ method: "GET" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((input: unknown) => ListChatHistoryInput.parse(input ?? {}))
+  .handler(async ({ data, context }): Promise<ChatTurnRecord[]> => {
+    let query = context.supabase
+      .from("chat_turns")
+      .select("id,role,content,page_title,page_url,created_at")
+      .order("created_at", { ascending: false })
+      .limit(data.limit);
+    if (data.search) query = query.ilike("content", `%${data.search}%`);
+    const { data: rows, error } = await query;
+    if (error) throw new Error(error.message);
+    return (rows ?? []) as ChatTurnRecord[];
+  });
+
+export const deleteChatTurn = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((input: unknown) => z.object({ turnId: z.string().uuid() }).parse(input))
+  .handler(async ({ data, context }): Promise<{ ok: true }> => {
+    const { error } = await context.supabase.from("chat_turns").delete().eq("id", data.turnId);
+    if (error) throw new Error(error.message);
+    return { ok: true };
+  });
+
+export const clearChatHistory = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .handler(async ({ context }): Promise<{ ok: true }> => {
+    const { error } = await context.supabase
+      .from("chat_turns")
+      .delete()
+      .eq("user_id", context.userId);
+    if (error) throw new Error(error.message);
+    return { ok: true };
+  });

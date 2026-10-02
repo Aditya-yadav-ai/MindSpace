@@ -1,0 +1,10 @@
+{
+  "manifest_version": 3,
+  "name": "MindSpace",
+  "description": "A focused browser workspace for understanding the web.",
+  "version": "0.1.0",
+  "permissions": ["sidePanel", "storage", "activeTab"],
+  "action": { "default_title": "Open MindSpace" },
+  "side_panel": { "default_path": "/" },
+  "background": { "service_worker": "extension-background.js" }
+}
