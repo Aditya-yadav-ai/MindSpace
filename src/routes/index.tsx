@@ -560,6 +560,8 @@ function WorkspaceHome({
           clear={page.clear}
           captureSelection={page.captureSelection}
           wordCount={page.wordCount}
+          screenshot={page.screenshot}
+          captureStatus={page.captureStatus}
         />
       </div>
 

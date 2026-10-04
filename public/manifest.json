@@ -3,8 +3,14 @@
   "name": "MindSpace",
   "description": "A focused browser workspace for understanding the web.",
   "version": "0.1.0",
-  "permissions": ["sidePanel", "storage", "activeTab"],
+  "permissions": ["sidePanel", "storage", "activeTab", "scripting"],
   "action": { "default_title": "Open MindSpace" },
-  "side_panel": { "default_path": "/" },
+  "commands": {
+    "capture-visible-tab": {
+      "suggested_key": { "default": "Alt+B" },
+      "description": "Capture the visible page and open MindSpace"
+    }
+  },
+  "side_panel": { "default_path": "index.html" },
   "background": { "service_worker": "extension-background.js" }
 }

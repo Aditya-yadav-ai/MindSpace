@@ -9,12 +9,16 @@ export function ContextCapture({
   clear,
   captureSelection,
   wordCount,
+  screenshot,
+  captureStatus,
 }: {
   context: PageContext;
   update: (patch: Partial<PageContext>) => void;
   clear: () => void;
   captureSelection: () => string;
   wordCount: number;
+  screenshot: string | null;
+  captureStatus: string | null;
 }) {
   const bridge = hasExtensionBridge();
 
@@ -31,6 +35,23 @@ export function ContextCapture({
         </div>
         <span className="font-mono text-[11px] text-foreground/40">{wordCount} words</span>
       </div>
+
+      {captureStatus && (
+        <p className="mt-3 text-xs text-foreground/60" role="status">
+          {captureStatus}
+        </p>
+      )}
+
+      {screenshot && (
+        <div className="mt-4">
+          <p className="mb-2 text-xs font-medium">Captured screenshot</p>
+          <img
+            src={screenshot}
+            alt="Screenshot of the visible browser tab"
+            className="max-h-80 w-full rounded-md border border-border bg-background object-contain object-top"
+          />
+        </div>
+      )}
 
       <div className="mt-4 grid gap-3 sm:grid-cols-2">
         <label className="block text-xs font-medium text-foreground">

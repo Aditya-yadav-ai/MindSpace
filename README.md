@@ -112,14 +112,9 @@ https://<project-ref>.supabase.co/auth/v1/callback
 
 ## Chrome extension usage
 
-This project includes Chrome extension scaffolding in `public/manifest.json` and `public/extension-background.js`.
+Build the extension package with `npm run build:extension`. In Chrome, open `chrome://extensions`, enable Developer mode, choose **Load unpacked**, and select `.output/public`. The `Alt+B` command captures the visible tab, opens MindSpace, and shows the screenshot in Page Context.
 
-To load it in Chrome:
-
-1. Open `chrome://extensions`
-2. Enable Developer mode
-3. Choose Load unpacked
-4. Select the project folder containing the manifest
+Chrome-restricted pages may not provide readable page text. The screenshot is kept in extension session storage and is not automatically sent to the AI.
 
 ## Build
 
