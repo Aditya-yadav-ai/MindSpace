@@ -1,41 +1,35 @@
 import { createFileRoute } from "@tanstack/react-router";
 import type { Session } from "@supabase/supabase-js";
-import {
-  ArrowLeft,
-  ArrowRight,
-  Bookmark,
-  BookOpen,
-  ChevronUp,
-  Clock3,
-  Home,
-  ListTodo,
-  LoaderCircle,
-  LogOut,
-  Menu,
-  PenLine,
-  RefreshCw,
-  Repeat,
-  Settings,
-  Sparkles,
-  X,
-} from "lucide-react";
-import { FormEvent, useEffect, useMemo, useState } from "react";
-
-import frostImage from "@/assets/mindspace-frost.jpg";
+import { Laptop, LoaderCircle, LogOut, Moon, ShieldCheck, Sun } from "lucide-react";
+import { useEffect, useState, type FormEvent } from "react";
 import { AgentActivity } from "@/components/mindspace/agent-activity";
+import { ApprovalsView } from "@/components/mindspace/approvals-view";
+import { AskMindSpaceView } from "@/components/mindspace/ask-mindspace-view";
 import { AutomationsPanel } from "@/components/mindspace/automations-panel";
+import { CollectionsView } from "@/components/mindspace/collections-view";
+import { ConnectedAccountsView } from "@/components/mindspace/connected-accounts-view";
 import { ConnectedServices } from "@/components/mindspace/connected-services";
-import { ChatPanel } from "@/components/mindspace/chat-panel";
-import { ContextCapture } from "@/components/mindspace/context-capture";
+import { CurrentCaptureView } from "@/components/mindspace/current-capture-view";
 import { HistoryPanel } from "@/components/mindspace/history-panel";
 import { KnowledgeBase } from "@/components/mindspace/knowledge-base";
 import { MemorySettings } from "@/components/mindspace/memory-settings";
-import { usePageContext } from "@/components/mindspace/page-context";
+import { MyWorkspaceView } from "@/components/mindspace/my-workspace-view";
+import { NotificationsView } from "@/components/mindspace/notifications-view";
+import { ObservabilityView } from "@/components/mindspace/observability-view";
+import { OverviewView } from "@/components/mindspace/overview-view";
+import { domainOf, usePageContext, useSavedPages } from "@/components/mindspace/page-context";
+import { SavedPages } from "@/components/mindspace/saved-pages";
+import { VIEW_LABELS, type MindSpaceView } from "@/components/mindspace/nav-items";
+import { SidebarNav } from "@/components/mindspace/sidebar-nav";
 import { TasksPanel } from "@/components/mindspace/tasks-panel";
+import { TopBar } from "@/components/mindspace/top-bar";
+import { SurfaceCard, ViewHeader } from "@/components/mindspace/ui";
+import { WorkspaceHome } from "@/components/mindspace/workspace-home";
 import { WritingStudio } from "@/components/mindspace/writing-studio";
 import { Button } from "@/components/ui/button";
 import { lovable } from "@/integrations/lovable";
 import { supabase } from "@/integrations/supabase/client";
+import { useTheme } from "@/lib/theme";
 import { cn } from "@/lib/utils";
 
 export const Route = createFileRoute("/")({
@@ -59,21 +53,13 @@ export const Route = createFileRoute("/")({
 });
 
 type AuthMode = "signin" | "signup";
-type View =
-  | "workspace"
-  | "writing"
-  | "knowledge"
-  | "agents"
-  | "tasks"
-  | "saved"
-  | "sessions"
-  | "automations"
-  | "settings";
 
-function MindSpaceApp() {
+export function MindSpaceApp() {
   const [session, setSession] = useState<Session | null>(null);
   const [checking, setChecking] = useState(true);
-  const [demo, setDemo] = useState(false);
+  const isExtension =
+    typeof window !== "undefined" && typeof chrome !== "undefined" && Boolean(chrome?.runtime?.id);
+  const [demo, setDemo] = useState(isExtension);
 
   useEffect(() => {
     void supabase.auth.getSession().then(({ data }) => {
@@ -88,7 +74,7 @@ function MindSpaceApp() {
 
   if (checking) {
     return (
-      <div className="grid min-h-screen place-items-center bg-workspace text-workspace-foreground">
+      <div className="grid min-h-dvh place-items-center bg-background text-foreground">
         <LoaderCircle className="size-5 animate-spin" aria-label="Loading MindSpace" />
       </div>
     );
@@ -98,6 +84,10 @@ function MindSpaceApp() {
 
   return <Workspace session={session} onExitDemo={() => setDemo(false)} />;
 }
+
+/* -------------------------------------------------------------------------- */
+/* Authentication                                                            */
+/* -------------------------------------------------------------------------- */
 
 function AuthScreen({ onPreview }: { onPreview: () => void }) {
   const [mode, setMode] = useState<AuthMode>("signin");
@@ -174,100 +164,104 @@ function AuthScreen({ onPreview }: { onPreview: () => void }) {
   }
 
   return (
-    <main className="relative min-h-screen overflow-hidden bg-background p-4 sm:p-8">
-      <img
-        src={frostImage}
-        alt=""
-        width={1920}
-        height={1080}
-        className="absolute inset-0 size-full object-cover"
-      />
-      <div className="absolute inset-0 bg-background/65 backdrop-blur-xl" />
-      <div className="relative mx-auto flex min-h-[calc(100vh-4rem)] max-w-5xl items-center justify-center">
-        <section className="grid w-full overflow-hidden rounded-lg border border-background/60 bg-panel/85 shadow-2xl backdrop-blur-xl md:grid-cols-[1.05fr_0.95fr]">
-          <div className="hidden min-h-[610px] flex-col justify-between bg-workspace p-10 text-workspace-foreground md:flex">
-            <Brand />
-            <div>
-              <p className="font-mono text-[11px] uppercase tracking-[0.16em] text-workspace-foreground/45">
-                Stage 6 · Workspace Expansion
-              </p>
-              <h1 className="mt-4 max-w-sm font-display text-5xl font-medium leading-[1.08]">
-                A quieter place to think with the web.
-              </h1>
-              <p className="mt-5 max-w-sm text-sm leading-6 text-workspace-foreground/55">
-                Bring in the page you are reading and MindSpace will summarise it, explain it or
-                pull out the key facts.
-              </p>
-            </div>
-            <div className="flex items-center gap-2 font-mono text-[11px] text-workspace-foreground/55">
-              <span className="status-pulse size-2 rounded-full bg-positive" /> Assistant online
-            </div>
+    <main className="grid min-h-dvh place-items-center bg-background px-4 py-10">
+      <section className="grid w-full max-w-4xl overflow-hidden rounded-2xl border border-border bg-card shadow-[0_24px_60px_-40px_oklch(0.235_0.019_264/0.5)] md:grid-cols-[1fr_1fr]">
+        <div className="hidden flex-col justify-between bg-navy p-8 text-navy-foreground md:flex">
+          <BrandMark />
+
+          <div>
+            <p className="font-mono text-[10.5px] uppercase tracking-[0.18em] text-navy-muted">
+              Browser workspace
+            </p>
+            <h1 className="mt-4 max-w-xs text-[34px] font-semibold leading-[1.15]">
+              A quieter place to think with the web.
+            </h1>
+            <p className="mt-4 max-w-xs text-[13px] leading-6 text-navy-muted">
+              Bring in the page you are reading and MindSpace will summarize it, explain it or pull
+              out the key facts.
+            </p>
           </div>
-          <div className="flex min-h-[610px] flex-col justify-center px-6 py-10 sm:px-12">
-            <div className="mb-9 md:hidden">
-              <Brand dark />
-            </div>
-            <p className="font-mono text-[11px] uppercase tracking-[0.16em] text-primary">
-              {mode === "signin" ? "Welcome back" : "Create your space"}
-            </p>
-            <h2 className="mt-2 font-display text-3xl font-medium">
-              {mode === "signin" ? "Sign in to MindSpace" : "Start with MindSpace"}
-            </h2>
-            <p className="mt-2 text-sm text-muted-foreground">
-              {mode === "signin"
-                ? "Continue to your browser workspace."
-                : "Your account keeps future context private and in sync."}
-            </p>
-            <form onSubmit={submit} className="mt-7 space-y-4">
-              <label className="block text-xs font-medium text-foreground">
-                Email
-                <input
-                  required
-                  type="email"
-                  value={email}
-                  onChange={(event) => setEmail(event.target.value)}
-                  placeholder="you@example.com"
-                  className="mt-1.5 h-10 w-full rounded-md border border-input bg-background/70 px-3 text-sm outline-none transition focus:border-primary focus:ring-2 focus:ring-primary/15"
-                />
-              </label>
-              <label className="block text-xs font-medium text-foreground">
-                Password
-                <input
-                  required
-                  minLength={6}
-                  type="password"
-                  value={password}
-                  onChange={(event) => setPassword(event.target.value)}
-                  placeholder="At least 6 characters"
-                  className="mt-1.5 h-10 w-full rounded-md border border-input bg-background/70 px-3 text-sm outline-none transition focus:border-primary focus:ring-2 focus:ring-primary/15"
-                />
-              </label>
-              {message && (
-                <p
-                  className="rounded-md bg-secondary px-3 py-2 text-xs text-secondary-foreground"
-                  role="status"
-                >
-                  {message}
-                </p>
-              )}
-              <Button className="w-full" disabled={busy}>
-                {busy && <LoaderCircle className="animate-spin" />}
-                {mode === "signin" ? "Sign in" : "Create account"}
-              </Button>
-            </form>
-            <div className="my-5 flex items-center gap-3 text-[10px] uppercase text-muted-foreground before:h-px before:flex-1 before:bg-border after:h-px after:flex-1 after:bg-border">
-              or
-            </div>
-            <Button
-              variant="outline"
-              className="w-full"
-              onClick={() => void googleSignIn()}
-              disabled={busy}
-            >
-              Continue with Google
+
+          <p className="flex items-start gap-2 text-[11.5px] leading-5 text-navy-muted">
+            <ShieldCheck className="mt-0.5 size-3.5 shrink-0" aria-hidden="true" />
+            MindSpace only reads the page text you add. It cannot browse, click or act for you.
+          </p>
+        </div>
+
+        <div className="px-6 py-9 sm:px-10">
+          <div className="mb-8 md:hidden">
+            <BrandMark dark />
+          </div>
+
+          <p className="font-mono text-[10.5px] uppercase tracking-[0.18em] text-primary">
+            {mode === "signin" ? "Welcome back" : "Create your space"}
+          </p>
+          <h2 className="mt-2 text-[24px] font-semibold text-foreground">
+            {mode === "signin" ? "Sign in to MindSpace" : "Start with MindSpace"}
+          </h2>
+          <p className="mt-2 text-[13px] text-muted-foreground">
+            {mode === "signin"
+              ? "Continue to your browser workspace."
+              : "Your account keeps future context private and in sync."}
+          </p>
+
+          <form onSubmit={submit} className="mt-6 space-y-4">
+            <label className="block text-[11.5px] font-medium text-foreground">
+              Email
+              <input
+                required
+                type="email"
+                value={email}
+                onChange={(event) => setEmail(event.target.value)}
+                placeholder="you@example.com"
+                autoComplete="email"
+                className="mt-1.5 h-10 w-full rounded-lg border border-input bg-background px-3 text-[13px] outline-none transition-colors focus:border-primary focus:ring-2 focus:ring-primary/15"
+              />
+            </label>
+            <label className="block text-[11.5px] font-medium text-foreground">
+              Password
+              <input
+                required
+                minLength={6}
+                type="password"
+                value={password}
+                onChange={(event) => setPassword(event.target.value)}
+                placeholder="At least 6 characters"
+                autoComplete={mode === "signin" ? "current-password" : "new-password"}
+                className="mt-1.5 h-10 w-full rounded-lg border border-input bg-background px-3 text-[13px] outline-none transition-colors focus:border-primary focus:ring-2 focus:ring-primary/15"
+              />
+            </label>
+            {message && (
+              <p
+                className="rounded-lg border border-border bg-muted px-3 py-2 text-[11.5px] leading-5 text-secondary-foreground"
+                role="status"
+              >
+                {message}
+              </p>
+            )}
+            <Button className="w-full" disabled={busy}>
+              {busy && <LoaderCircle className="animate-spin" />}
+              {mode === "signin" ? "Sign in" : "Create account"}
             </Button>
+          </form>
+
+          <div className="my-5 flex items-center gap-3 text-[10px] uppercase tracking-[0.14em] text-muted-foreground before:h-px before:flex-1 before:bg-border after:h-px after:flex-1 after:bg-border">
+            or
+          </div>
+
+          <Button
+            variant="outline"
+            className="w-full"
+            onClick={() => void googleSignIn()}
+            disabled={busy}
+          >
+            Continue with Google
+          </Button>
+
+          <div className="mt-5 flex flex-col gap-2 text-[11.5px]">
             <button
-              className="mt-5 text-xs text-muted-foreground hover:text-foreground"
+              type="button"
+              className="w-fit text-muted-foreground transition-colors hover:text-foreground"
               onClick={() => {
                 setMode(mode === "signin" ? "signup" : "signin");
                 setMessage(null);
@@ -278,352 +272,311 @@ function AuthScreen({ onPreview }: { onPreview: () => void }) {
                 : "Already have an account? Sign in"}
             </button>
             <button
-              className="mt-3 text-xs font-medium text-primary hover:text-primary/75"
+              type="button"
+              className="w-fit font-medium text-primary transition-colors hover:text-primary/75"
               onClick={onPreview}
             >
               Preview the workspace
             </button>
           </div>
-        </section>
-      </div>
+        </div>
+      </section>
     </main>
   );
 }
 
-function Brand({ dark = false }: { dark?: boolean }) {
+function BrandMark({ dark = false }: { dark?: boolean }) {
   return (
     <div className="flex items-center gap-2.5">
-      <div className="grid size-8 place-items-center rounded-md bg-primary font-display text-sm italic text-primary-foreground">
+      <div
+        className={cn(
+          "grid size-9 place-items-center rounded-xl text-[15px] font-bold",
+          dark ? "bg-navy text-navy-foreground" : "bg-navy-foreground text-navy",
+        )}
+      >
         M
       </div>
       <div className="leading-tight">
         <p
           className={cn(
-            "text-sm font-semibold",
-            dark ? "text-foreground" : "text-workspace-foreground",
+            "text-[14px] font-semibold tracking-tight",
+            dark ? "text-foreground" : "text-navy-foreground",
           )}
         >
           MindSpace
         </p>
-        <p
-          className={cn(
-            "font-mono text-[10px]",
-            dark ? "text-muted-foreground" : "text-workspace-foreground/45",
-          )}
-        >
-          stage 6 · workspace expansion
+        <p className={cn("text-[10.5px]", dark ? "text-muted-foreground" : "text-navy-muted")}>
+          Browser workspace
         </p>
       </div>
     </div>
   );
 }
 
-function Workspace({ session, onExitDemo }: { session: Session | null; onExitDemo: () => void }) {
-  const [view, setView] = useState<View>("workspace");
+/* -------------------------------------------------------------------------- */
+/* Workspace shell                                                           */
+/* -------------------------------------------------------------------------- */
+
+export function Workspace({
+  session,
+  onExitDemo,
+}: {
+  session: Session | null;
+  onExitDemo: () => void;
+}) {
+  const [view, setView] = useState<MindSpaceView>("overview");
   const [menuOpen, setMenuOpen] = useState(false);
-  const [saved, setSaved] = useState(false);
-  const [showStatus, setShowStatus] = useState(true);
+  const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
+  const [captureOpen, setCaptureOpen] = useState(false);
+  const [showDetails, setShowDetails] = useState(true);
   const [quiet, setQuiet] = useState(false);
+
   const page = usePageContext();
-  const name =
+  const savedPages = useSavedPages();
+
+  const rawName =
     session?.user.user_metadata?.["full_name"] || session?.user.email?.split("@")[0] || "Explorer";
-  const initials = String(name)
-    .split(" ")
-    .map((part: string) => part[0])
-    .join("")
-    .slice(0, 2)
-    .toUpperCase();
+  const name = String(rawName);
+  const initials =
+    name
+      .split(" ")
+      .map((part: string) => part[0])
+      .join("")
+      .slice(0, 2)
+      .toUpperCase() || "M";
+  const user = {
+    name,
+    email: session?.user.email ?? "Preview session",
+    initials,
+    preview: !session,
+  };
 
   async function signOut() {
     if (session) await supabase.auth.signOut();
     else onExitDemo();
   }
 
-  const nav = [
-    { id: "workspace" as const, label: "Workspace", icon: Home },
-    { id: "writing" as const, label: "Writing", icon: PenLine },
-    { id: "knowledge" as const, label: "Knowledge base", icon: BookOpen },
-    { id: "agents" as const, label: "Agent activity", icon: Sparkles },
-    { id: "tasks" as const, label: "Tasks", icon: ListTodo },
-    { id: "saved" as const, label: "Saved pages", icon: Bookmark },
-    { id: "sessions" as const, label: "History", icon: Clock3 },
-    { id: "automations" as const, label: "Automations", icon: Repeat },
-    { id: "settings" as const, label: "Settings", icon: Settings },
-  ];
+  function selectView(next: MindSpaceView) {
+    setView(next);
+    setMenuOpen(false);
+  }
 
   return (
-    <div className="flex h-dvh overflow-hidden bg-workspace font-body text-foreground">
+    <div
+      className={cn(
+        "flex h-dvh overflow-hidden bg-background font-body text-foreground",
+        quiet && "quiet",
+      )}
+    >
       {menuOpen && (
         <button
-          aria-label="Close menu"
-          className="fixed inset-0 z-30 bg-workspace/35 md:hidden"
+          type="button"
+          aria-label="Close navigation"
+          className="fixed inset-0 z-30 bg-navy/40 md:hidden"
           onClick={() => setMenuOpen(false)}
         />
       )}
+
       <aside
         className={cn(
-          "fixed inset-y-0 left-0 z-40 flex w-[250px] shrink-0 flex-col border-r border-workspace-foreground/10 bg-workspace/95 text-workspace-foreground backdrop-blur-xl transition-transform md:static md:translate-x-0",
-          menuOpen ? "translate-x-0" : "-translate-x-full",
+          "fixed inset-y-0 left-0 z-40 shrink-0 transition-all duration-200 md:static md:translate-x-0",
+          sidebarCollapsed ? "md:w-16" : "md:w-[240px]",
+          menuOpen ? "translate-x-0 w-[240px]" : "-translate-x-full",
         )}
       >
-        <div className="flex items-center justify-between px-4 pb-3 pt-4">
-          <Brand />
-          <Button
-            variant="ghost"
-            size="icon"
-            className="md:hidden text-workspace-foreground"
-            onClick={() => setMenuOpen(false)}
-          >
-            <X />
-          </Button>
-        </div>
-        <div className="px-3 pt-2">
-          <div className="rounded-lg border border-workspace-foreground/10 bg-workspace-foreground/[0.06] p-2.5">
-            <div className="flex items-center gap-2">
-              <span className="status-pulse size-2 rounded-full bg-positive" />
-              <p className="font-mono text-[11px] text-workspace-foreground/80">Extension ready</p>
-            </div>
-            <p className="mt-1 pl-4 text-[10px] text-workspace-foreground/40">
-              v0.1.0 · Chrome shell
-            </p>
-          </div>
-        </div>
-        <nav className="mt-3 flex-1 space-y-1 px-3" aria-label="Main navigation">
-          {nav.map(({ id, label, icon: Icon }) => (
-            <button
-              key={id}
-              onClick={() => {
-                setView(id);
-                setMenuOpen(false);
-              }}
-              className={cn(
-                "flex w-full items-center gap-2.5 rounded-md px-2.5 py-2 text-sm transition-colors",
-                view === id
-                  ? "bg-workspace-foreground/[0.09] text-workspace-foreground"
-                  : "text-workspace-foreground/55 hover:bg-workspace-foreground/[0.05] hover:text-workspace-foreground/85",
-              )}
-            >
-              <Icon className={cn("size-3.5", view === id && "text-primary")} />
-              {label}
-            </button>
-          ))}
-        </nav>
-        <div className="p-3">
-          <button
-            onClick={() => setView("settings")}
-            className="flex w-full items-center gap-2.5 rounded-lg border border-workspace-foreground/10 bg-workspace-foreground/[0.05] p-2.5 text-left"
-          >
-            <div className="grid size-8 shrink-0 place-items-center rounded-full bg-primary/70 text-[11px] font-semibold">
-              {initials}
-            </div>
-            <div className="min-w-0 flex-1 leading-tight">
-              <p className="truncate text-xs font-medium text-workspace-foreground/85 capitalize">
-                {name}
-              </p>
-              <p className="truncate text-[10px] text-workspace-foreground/40">
-                {session?.user.email ?? "Preview session"}
-              </p>
-            </div>
-            <ChevronUp className="size-3 text-workspace-foreground/40" />
-          </button>
-        </div>
+        <SidebarNav
+          view={view}
+          onSelect={selectView}
+          user={user}
+          onSignOut={() => void signOut()}
+          onClose={() => setMenuOpen(false)}
+          collapsed={sidebarCollapsed}
+          onToggleCollapse={() => setSidebarCollapsed((c) => !c)}
+        />
       </aside>
 
-      <div className="relative flex min-w-0 flex-1 flex-col bg-background">
-        <img
-          src={frostImage}
-          alt=""
-          width={1920}
-          height={1080}
-          className="absolute inset-0 size-full object-cover"
+      <div className="flex min-w-0 flex-1 flex-col">
+        <TopBar
+          pageTitle={page.context.title.trim()}
+          domain={domainOf(page.context.url)}
+          hasContext={page.hasContent}
+          quiet={quiet}
+          onOpenMenu={() => setMenuOpen(true)}
+          onAddPageText={() => {
+            selectView("workspace");
+            setCaptureOpen(true);
+          }}
         />
-        <div className="absolute inset-0 bg-background/60 backdrop-blur-2xl" />
-        <header className="relative z-10 flex h-14 shrink-0 items-center gap-3 border-b border-background/50 bg-background/40 px-3 backdrop-blur-md sm:px-5">
-          <Button
-            variant="ghost"
-            size="icon"
-            className="md:hidden"
-            onClick={() => setMenuOpen(true)}
-          >
-            <Menu />
-          </Button>
-          <div className="flex min-w-0 items-center gap-2 rounded-full border border-background/70 bg-background/60 py-1 pl-2 pr-3">
-            <span className="size-2 shrink-0 rounded-full bg-primary" />
-            <span className="truncate font-mono text-xs text-foreground/70">
-              Current browser tab
-            </span>
-          </div>
-          <span className="hidden text-xs text-foreground/35 sm:inline">/</span>
-          <span className="hidden truncate text-xs font-medium text-foreground/75 sm:inline">
-            {page.context.title.trim() ||
-              (page.hasContent ? "Page text captured" : "No page captured yet")}
-          </span>
-          <div className="ml-auto flex items-center gap-1">
-            <Button variant="ghost" size="icon" aria-label="Previous tab" disabled>
-              <ArrowLeft />
-            </Button>
-            <Button variant="ghost" size="icon" aria-label="Next tab" disabled>
-              <ArrowRight />
-            </Button>
-            <Button variant="ghost" size="icon" aria-label="Refresh connection">
-              <RefreshCw />
-            </Button>
-          </div>
-        </header>
-        <div className="relative z-10 flex min-h-0 flex-1">
-          <main className="min-w-0 flex-1 overflow-y-auto px-4 py-6 sm:px-7">
-            {view === "workspace" && (
-              <WorkspaceHome
-                name={String(name)}
-                page={page}
-                saved={saved}
-                onSave={() => setSaved(true)}
+
+        <div className="flex min-h-0 flex-1">
+          <main className="scrollbar-slim min-w-0 flex-1 overflow-y-auto px-4 py-5 sm:px-6 sm:py-6">
+            {(view === "overview" || view === "home") && (
+              <OverviewView
+                name={name}
+                context={page.context}
+                onNavigate={(v) => selectView(v)}
+                onCapture={() => selectView("capture")}
               />
+            )}
+            {view === "capture" && (
+              <CurrentCaptureView context={page.context} onRunTask={() => selectView("agents")} />
+            )}
+            {view === "workspace" && (
+              <MyWorkspaceView
+                context={page.context}
+                signedIn={Boolean(session)}
+                savedItems={savedPages.items}
+                savedHydrated={savedPages.hydrated}
+                onRemoveSaved={savedPages.remove}
+              />
+            )}
+            {view === "approvals" && <ApprovalsView />}
+            {view === "notifications" && <NotificationsView />}
+            {view === "accounts" && <ConnectedAccountsView signedIn={Boolean(session)} />}
+            {view === "observability" && <ObservabilityView />}
+            {(view === "collections" || view === "saved") && (
+              <CollectionsView
+                items={savedPages.items}
+                hydrated={savedPages.hydrated}
+                onRemove={savedPages.remove}
+              />
+            )}
+            {view === "ask" && <AskMindSpaceView context={page.context} />}
+            {(view === "research" || view === "knowledge") && (
+              <KnowledgeBase signedIn={Boolean(session)} />
             )}
             {view === "writing" && (
               <WritingStudio seedText={page.context.selection || page.context.text} />
             )}
-            {view === "knowledge" && <KnowledgeBase signedIn={Boolean(session)} />}
             {view === "agents" && (
               <AgentActivity signedIn={Boolean(session)} context={page.context} />
             )}
-            {view === "tasks" && <TasksPanel signedIn={Boolean(session)} />}
-            {view === "saved" && (
-              <EmptyView
-                icon={Bookmark}
-                title="Saved pages"
-                copy={
-                  saved
-                    ? "Your current page is kept for this session. Syncing saved pages to your account comes later."
-                    : "Pages you save while browsing will collect here."
-                }
-              />
+            {(view === "history" || view === "sessions") && (
+              <HistoryPanel signedIn={Boolean(session)} />
             )}
-            {view === "sessions" && <HistoryPanel signedIn={Boolean(session)} />}
+            {view === "tasks" && <TasksPanel signedIn={Boolean(session)} />}
             {view === "automations" && <AutomationsPanel signedIn={Boolean(session)} />}
             {view === "settings" && (
               <SettingsView
-                showStatus={showStatus}
-                setShowStatus={setShowStatus}
+                showDetails={showDetails}
+                setShowDetails={setShowDetails}
                 quiet={quiet}
                 setQuiet={setQuiet}
                 onSignOut={() => void signOut()}
                 signedIn={Boolean(session)}
+                preview={!session}
               />
             )}
           </main>
-          {showStatus && <StatusPanel quiet={quiet} onSignOut={() => void signOut()} />}
+
+          {showDetails && (
+            <DetailsRail
+              view={view}
+              wordCount={page.wordCount}
+              hasContext={page.hasContent}
+              savedCount={savedPages.items.length}
+              preview={!session}
+            />
+          )}
         </div>
       </div>
     </div>
   );
 }
 
-function WorkspaceHome({
-  name,
-  page,
-  saved,
-  onSave,
-}: {
-  name: string;
-  page: ReturnType<typeof usePageContext>;
-  saved: boolean;
-  onSave: () => void;
-}) {
-  const hour = new Date().getHours();
-  const greeting = hour < 12 ? "Good morning" : hour < 18 ? "Good afternoon" : "Good evening";
-  return (
-    <div className="mx-auto flex min-h-full max-w-3xl flex-col">
-      <div className="flex flex-wrap items-end justify-between gap-3">
-        <div>
-          <p className="font-mono text-[11px] uppercase tracking-[0.16em] text-primary">
-            Browser workspace
-          </p>
-          <h1 className="mt-1.5 font-display text-3xl font-medium capitalize">
-            {greeting}, {name}
-          </h1>
-        </div>
-        <Button variant="secondary" size="sm" onClick={onSave} disabled={saved || !page.hasContent}>
-          <Bookmark />
-          {saved ? "Saved" : "Save this page"}
-        </Button>
-      </div>
-      <p className="mt-2 max-w-xl text-sm leading-6 text-foreground/60">
-        Bring in what you are reading, then ask MindSpace to summarize it, explain it or pull out
-        the key facts.
-      </p>
+/* -------------------------------------------------------------------------- */
+/* Details rail                                                              */
+/* -------------------------------------------------------------------------- */
 
-      <div className="mt-6">
-        <ContextCapture
-          context={page.context}
-          update={page.update}
-          clear={page.clear}
-          captureSelection={page.captureSelection}
-          wordCount={page.wordCount}
+function DetailsRail({
+  view,
+  wordCount,
+  hasContext,
+  savedCount,
+  preview,
+}: {
+  view: MindSpaceView;
+  wordCount: number;
+  hasContext: boolean;
+  savedCount: number;
+  preview: boolean;
+}) {
+  return (
+    <aside className="scrollbar-slim hidden w-[252px] shrink-0 overflow-y-auto border-l border-border bg-card px-4 py-5 xl:block">
+      <h2 className="font-mono text-[9.5px] uppercase tracking-[0.16em] text-muted-foreground">
+        This session
+      </h2>
+
+      <dl className="mt-3 space-y-2">
+        <RailRow label="View" value={VIEW_LABELS[view]} />
+        <RailRow
+          label="Page context"
+          value={hasContext ? `${wordCount.toLocaleString()} words added` : "Not added yet"}
         />
-      </div>
+        <RailRow label="Saved pages" value={`${savedCount} on this device`} />
+        <RailRow label="Account" value={preview ? "Preview mode" : "Signed in"} />
+      </dl>
 
-      <div className="mt-5 flex min-h-[26rem] flex-col">
-        <ChatPanel context={page.context} />
-      </div>
-    </div>
+      <h2 className="mt-6 font-mono text-[9.5px] uppercase tracking-[0.16em] text-muted-foreground">
+        Boundaries
+      </h2>
+      <p className="mt-3 text-[11.5px] leading-5 text-muted-foreground">
+        MindSpace only sees the page text you add. It cannot browse, click or act on your behalf,
+        and this build has no screenshot capture.
+      </p>
+    </aside>
   );
 }
 
-function EmptyView({
-  icon: Icon,
-  title,
-  copy,
-}: {
-  icon: typeof Bookmark;
-  title: string;
-  copy: string;
-}) {
+function RailRow({ label, value }: { label: string; value: string }) {
   return (
-    <div className="mx-auto max-w-3xl">
-      <p className="font-mono text-[11px] uppercase tracking-[0.16em] text-primary">MindSpace</p>
-      <h1 className="mt-2 font-display text-3xl font-medium">{title}</h1>
-      <div className="mt-7 grid min-h-72 place-items-center rounded-lg bg-panel/60 p-8 text-center ring-1 ring-foreground/5">
-        <div>
-          <Icon className="mx-auto size-6 text-primary" />
-          <p className="mt-4 text-sm font-medium">A clear space for now</p>
-          <p className="mt-1 max-w-sm text-xs leading-5 text-foreground/50">{copy}</p>
-        </div>
-      </div>
+    <div className="rounded-lg border border-border bg-background px-2.5 py-2">
+      <dt className="text-[10.5px] text-muted-foreground">{label}</dt>
+      <dd className="mt-0.5 truncate text-[12px] font-medium text-foreground">{value}</dd>
     </div>
   );
 }
+
+/* -------------------------------------------------------------------------- */
+/* Settings                                                                  */
+/* -------------------------------------------------------------------------- */
 
 function SettingsView({
-  showStatus,
-  setShowStatus,
+  showDetails,
+  setShowDetails,
   quiet,
   setQuiet,
   onSignOut,
   signedIn,
+  preview,
 }: {
-  showStatus: boolean;
-  setShowStatus: (value: boolean) => void;
+  showDetails: boolean;
+  setShowDetails: (value: boolean) => void;
   quiet: boolean;
   setQuiet: (value: boolean) => void;
   onSignOut: () => void;
   signedIn: boolean;
+  preview: boolean;
 }) {
   return (
-    <div className="mx-auto max-w-3xl">
-      <p className="font-mono text-[11px] uppercase tracking-[0.16em] text-primary">Preferences</p>
-      <h1 className="mt-2 font-display text-3xl font-medium">Settings</h1>
-      <div className="mt-7 divide-y divide-border rounded-lg bg-panel/70 px-5 ring-1 ring-foreground/5">
-        {" "}
+    <div className="mx-auto w-full max-w-3xl">
+      <ViewHeader
+        eyebrow="Settings"
+        title="Preferences"
+        description="How the workspace behaves, and what it is connected to."
+      />
+
+      <SurfaceCard className="mt-5 px-4 sm:px-5">
+        <ThemeSettingRow />
         <SettingRow
-          label="Show system status"
-          copy="Keep connection details visible beside your workspace."
-          checked={showStatus}
-          onChange={setShowStatus}
+          label="Show page details"
+          copy="Keep a summary of this session beside your workspace on wide screens."
+          checked={showDetails}
+          onChange={setShowDetails}
         />
         <SettingRow
-          label="Quiet mode"
-          copy="Reduce connection animations and visual signals."
+          label="Reduce motion"
+          copy="Turn off the workspace's optional fade and pulse animations."
           checked={quiet}
           onChange={setQuiet}
         />
@@ -634,20 +587,60 @@ function SettingsView({
           disabled
           onChange={() => undefined}
         />
-      </div>
+      </SurfaceCard>
+
       <ConnectedServices signedIn={signedIn} />
       <MemorySettings signedIn={signedIn} />
-      <div className="mt-6 flex items-center justify-between rounded-lg bg-panel/70 p-5 ring-1 ring-foreground/5">
+
+      <SurfaceCard className="mt-4 flex items-center justify-between gap-4 p-4 sm:p-5">
         <div>
-          <p className="text-sm font-medium">Account session</p>
-          <p className="mt-1 text-xs text-foreground/45">
-            Securely end this session on this browser.
+          <p className="text-sm font-medium text-foreground">
+            {preview ? "Preview session" : "Account session"}
+          </p>
+          <p className="mt-1 text-[11.5px] leading-5 text-muted-foreground">
+            {preview
+              ? "You are previewing the workspace without an account, so nothing is saved to a server."
+              : "Securely end this session on this browser."}
           </p>
         </div>
         <Button variant="outline" size="sm" onClick={onSignOut}>
-          <LogOut />
-          Sign out
+          <LogOut aria-hidden="true" />
+          {preview ? "Exit preview" : "Sign out"}
         </Button>
+      </SurfaceCard>
+    </div>
+  );
+}
+
+function ThemeSettingRow() {
+  const { theme, setTheme } = useTheme();
+  return (
+    <div className="flex flex-wrap items-center justify-between gap-4 border-b border-border py-4">
+      <div>
+        <p className="text-[13px] font-medium text-foreground">Theme & Appearance</p>
+        <p className="mt-1 text-[11.5px] leading-5 text-muted-foreground">
+          Persistent theme preference across refresh, extension reloads, and browser restarts.
+        </p>
+      </div>
+      <div className="inline-flex rounded-lg border border-border bg-muted/60 p-1">
+        {(["light", "dark", "system"] as const).map((t) => (
+          <button
+            key={t}
+            type="button"
+            onClick={() => setTheme(t)}
+            className={cn(
+              "flex items-center gap-1.5 rounded-md px-3 py-1 text-[12px] font-medium capitalize transition-colors",
+              theme === t
+                ? "bg-background text-foreground shadow-sm"
+                : "text-muted-foreground hover:text-foreground",
+            )}
+          >
+            {t === "light" && <Sun className="size-3.5" />}
+            {t === "dark" && <Moon className="size-3.5" />}
+            {t === "system" && <Laptop className="size-3.5" />}
+            {t}
+          </button>
+        ))}
       </div>
     </div>
   );
@@ -667,15 +660,16 @@ function SettingRow({
   disabled?: boolean;
 }) {
   return (
-    <div className="flex items-center justify-between gap-5 py-5">
+    <div className="flex items-center justify-between gap-5 border-b border-border py-4 last:border-b-0">
       <div>
-        <p className="text-sm font-medium">{label}</p>
-        <p className="mt-1 text-xs leading-5 text-foreground/45">{copy}</p>
+        <p className="text-[13px] font-medium text-foreground">{label}</p>
+        <p className="mt-1 text-[11.5px] leading-5 text-muted-foreground">{copy}</p>
       </div>
       <button
         type="button"
         role="switch"
         aria-checked={checked}
+        aria-label={label}
         disabled={disabled}
         onClick={() => onChange(!checked)}
         className={cn(
@@ -685,8 +679,8 @@ function SettingRow({
       >
         <span
           className={cn(
-            "absolute top-1 size-4 rounded-full bg-primary-foreground transition-transform",
-            checked ? "translate-x-1" : "-translate-x-4",
+            "absolute top-1 size-4 rounded-full bg-primary-foreground shadow-sm transition-transform",
+            checked ? "translate-x-5" : "translate-x-1",
           )}
         />
       </button>
@@ -694,63 +688,4 @@ function SettingRow({
   );
 }
 
-function StatusPanel({ quiet, onSignOut }: { quiet: boolean; onSignOut: () => void }) {
-  const statuses = useMemo(
-    () => [
-      { label: "Extension", value: "ready", tone: "positive" },
-      { label: "Cloud", value: "connected", tone: "positive" },
-      { label: "Assistant", value: "live", tone: "positive" },
-      { label: "Agents", value: "live", tone: "positive" },
-    ],
-    [],
-  );
-  return (
-    <aside className="hidden w-[236px] shrink-0 overflow-y-auto border-l border-background/50 bg-background/45 px-4 py-5 backdrop-blur-md lg:block">
-      <h2 className="font-mono text-[11px] uppercase tracking-[0.16em] text-foreground/45">
-        System
-      </h2>
-      <div className="mt-3 space-y-2">
-        {statuses.map((item) => (
-          <div key={item.label} className="rounded-lg bg-panel/65 p-2.5 ring-1 ring-foreground/5">
-            <div className="flex items-center justify-between">
-              <span className="text-xs text-foreground/70">{item.label}</span>
-              <span
-                className={cn(
-                  "flex items-center gap-1.5 font-mono text-[11px]",
-                  item.tone === "positive" ? "text-positive" : "text-caution",
-                )}
-              >
-                <span
-                  className={cn(
-                    "size-1.5 rounded-full",
-                    item.tone === "positive" ? "bg-positive" : "bg-caution",
-                    !quiet && item.label === "Extension" && "status-pulse",
-                  )}
-                />
-                {item.value}
-              </span>
-            </div>
-          </div>
-        ))}
-      </div>
-      <h2 className="mt-6 font-mono text-[11px] uppercase tracking-[0.16em] text-foreground/45">
-        Boundaries
-      </h2>
-      <p className="mt-3 text-xs leading-5 text-foreground/55">
-        MindSpace only sees the page text you bring in. It cannot browse, click or act on your
-        behalf.
-      </p>
-      <div className="mt-6 border-t border-background/60 pt-4">
-        <div className="flex items-center justify-between">
-          <div>
-            <p className="text-xs font-medium">Account</p>
-            <p className="text-[10px] text-foreground/40">Workspace access</p>
-          </div>
-          <Button variant="ghost" size="sm" onClick={onSignOut}>
-            Sign out
-          </Button>
-        </div>
-      </div>
-    </aside>
-  );
-}
+/* -------------------------------------------------------------------------- */

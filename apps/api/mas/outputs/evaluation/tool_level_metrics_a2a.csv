@@ -1,0 +1,13 @@
+run_id,run_number,persona,architecture,query,latency_ms,tokens_used,estimated_cost_usd,tool_calls,guardrail_flags,confidence,status,error,timestamp
+b27fc246-9aae-43cb-93f9-c11d00f7697a,1,professional_analyst,parallel,Analyze the wireless headphones market for Q4 opportunities,5608.86,0,0.0,1,0,0.5,partial,,2026-10-27T05:37:06.384640
+2dd4b94b-5f49-4152-b01a-267aa99e1062,2,professional_analyst,sequential,Analyze the wireless headphones market for Q4 opportunities,1770.46,0,0.0,1,0,0.5,partial,,2026-10-27T05:37:08.572539
+46014628-a7df-4afa-9462-927dc1a9376b,3,professional_analyst,hierarchical,Analyze the wireless headphones market for Q4 opportunities,1773.39,0,0.0,1,0,0.5,partial,,2026-10-27T05:37:10.760421
+8d84ee5e-9266-4437-87a1-4f16e13396ab,4,professional_analyst,react,Analyze the wireless headphones market for Q4 opportunities,1808.03,0,0.0,1,0,0.5,partial,,2026-10-27T05:37:12.987594
+399da4c9-6861-4d44-9f5a-6f47b7f20c54,1,professional_analyst,parallel,Analyze the wireless headphones market for Q4 opportunities,3337.6,0,0.0,1,0,0.5,partial,,2026-10-28T04:04:40.419371
+46b0f8e5-4f05-4214-b68b-6e7895dcbba0,2,professional_analyst,sequential,Analyze the wireless headphones market for Q4 opportunities,3373.57,0,0.0,1,0,0.5,partial,,2026-10-28T04:04:44.211561
+902c7d7e-301a-4277-8d66-0460a8850512,3,professional_analyst,hierarchical,Analyze the wireless headphones market for Q4 opportunities,1747.97,0,0.0,1,0,0.5,partial,,2026-10-28T04:04:46.367998
+6f81494c-48ed-4f0b-bf71-b781503651eb,4,professional_analyst,react,Analyze the wireless headphones market for Q4 opportunities,1706.32,0,0.0,1,0,0.5,partial,,2026-10-28T04:04:48.489365
+5e2a2dd6-9ff7-436d-bebd-8b4e07958212,1,professional_analyst,parallel,Analyze the wireless headphones market for Q4 opportunities,2882.25,0,0.0,1,0,0.5,partial,,2026-10-28T04:08:23.195125
+38d8866c-f946-46cb-942d-8cd56cc10a16,2,professional_analyst,sequential,Analyze the wireless headphones market for Q4 opportunities,6601.02,0,0.0,1,0,0.5,partial,,2026-10-28T04:08:30.250962
+27de9ee3-54db-458a-b8d5-18595ceacd43,3,professional_analyst,hierarchical,Analyze the wireless headphones market for Q4 opportunities,1914.27,0,0.0,1,0,0.5,partial,,2026-10-28T04:08:32.578521
+ef412ecb-9102-4b71-81d1-436c5b7d74bb,4,professional_analyst,react,Analyze the wireless headphones market for Q4 opportunities,2141.44,0,0.0,1,0,0.5,partial,,2026-10-28T04:08:35.150308

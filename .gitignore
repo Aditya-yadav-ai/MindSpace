@@ -43,6 +43,31 @@ lerna-debug.log*
 # OS / cache
 Thumbs.db
 
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+.pytest_cache/
+.venv/
+.venv*/
+venv/
+
+# Python service local env (explicit, in addition to the .env rules above)
+apps/api/.env
+
 # Optional: local project state
 .tanstack/
 .dev.vars
+
+# Local backups and generated builds
+backups/
+dist-extension/
+.output/
+.tanstack/
+.pytest_cache/
+.kiro/settings/
+
+# Local environment
+.env
+.env.local
+apps/api/.env

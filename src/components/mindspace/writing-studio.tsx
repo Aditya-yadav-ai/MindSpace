@@ -3,6 +3,7 @@ import { Copy, LoaderCircle, PenLine } from "lucide-react";
 import { useState } from "react";
 
 import { Button } from "@/components/ui/button";
+import { ViewHeader } from "@/components/mindspace/ui";
 import { generateWriting } from "@/lib/writing.functions";
 import { cn } from "@/lib/utils";
 
@@ -46,14 +47,14 @@ export function WritingStudio({ seedText = "" }: { seedText?: string }) {
   }
 
   return (
-    <div className="mx-auto max-w-3xl">
-      <p className="font-mono text-[11px] uppercase tracking-[0.16em] text-primary">Writing</p>
-      <h1 className="mt-2 font-display text-3xl font-medium">Write with MindSpace</h1>
-      <p className="mt-2 max-w-xl text-sm leading-6 text-foreground/60">
-        Draft something new, or paste your own text to rewrite, shorten or expand it.
-      </p>
+    <div className="mx-auto w-full max-w-3xl">
+      <ViewHeader
+        eyebrow="Writing"
+        title="Write with MindSpace"
+        description="Draft something new, or paste your own text to rewrite, shorten or expand it."
+      />
 
-      <section className="mt-6 rounded-lg bg-panel/70 p-4 ring-1 ring-foreground/5 backdrop-blur-md">
+      <section className="mt-6 rounded-lg bg-card p-4 ring-1 ring-border">
         <div className="flex flex-wrap gap-2">
           {KINDS.map((item) => (
             <button
@@ -63,7 +64,7 @@ export function WritingStudio({ seedText = "" }: { seedText?: string }) {
                 "rounded-md px-3 py-1.5 text-xs font-medium transition-colors",
                 kind === item.id
                   ? "bg-primary text-primary-foreground"
-                  : "bg-background/60 text-foreground/60 hover:text-foreground",
+                  : "bg-background text-muted-foreground hover:text-foreground",
               )}
             >
               {item.label}
@@ -78,7 +79,7 @@ export function WritingStudio({ seedText = "" }: { seedText?: string }) {
                 "rounded-md px-3 py-1.5 text-xs transition-colors",
                 tone === item.id
                   ? "bg-secondary text-secondary-foreground"
-                  : "text-foreground/50 hover:text-foreground",
+                  : "text-muted-foreground hover:text-foreground",
               )}
             >
               {item.label}
@@ -92,7 +93,7 @@ export function WritingStudio({ seedText = "" }: { seedText?: string }) {
             value={instruction}
             onChange={(event) => setInstruction(event.target.value)}
             placeholder="A short summary email about this research…"
-            className="mt-1.5 h-10 w-full rounded-md border border-input bg-background/70 px-3 text-sm outline-none transition focus:border-primary focus:ring-2 focus:ring-primary/15"
+            className="mt-1.5 h-10 w-full rounded-md border border-input bg-background px-3 text-sm outline-none transition focus:border-primary focus:ring-2 focus:ring-primary/15"
           />
         </label>
 
@@ -104,7 +105,7 @@ export function WritingStudio({ seedText = "" }: { seedText?: string }) {
               onChange={(event) => setDraft(event.target.value)}
               rows={6}
               placeholder="Paste the text to work on…"
-              className="mt-1.5 w-full resize-y rounded-md border border-input bg-background/70 p-3 text-sm leading-6 outline-none transition focus:border-primary focus:ring-2 focus:ring-primary/15"
+              className="mt-1.5 w-full resize-y rounded-md border border-input bg-background p-3 text-sm leading-6 outline-none transition focus:border-primary focus:ring-2 focus:ring-primary/15"
             />
           </label>
         )}
@@ -129,7 +130,7 @@ export function WritingStudio({ seedText = "" }: { seedText?: string }) {
       </section>
 
       {result && (
-        <section className="mt-4 rounded-lg bg-panel/70 p-4 ring-1 ring-foreground/5 backdrop-blur-md">
+        <section className="mt-4 rounded-lg bg-card p-4 ring-1 ring-border">
           <div className="flex items-center justify-between">
             <h2 className="text-sm font-semibold">Result</h2>
             <Button

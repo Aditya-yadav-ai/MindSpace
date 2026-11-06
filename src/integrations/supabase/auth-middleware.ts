@@ -2,6 +2,7 @@
 import { createMiddleware } from "@tanstack/react-start";
 import { getRequest } from "@tanstack/react-start/server";
 import { createClient } from "@supabase/supabase-js";
+import type { JwtPayload } from "@supabase/supabase-js";
 import type { Database } from "./types";
 
 function isNewSupabaseApiKey(value: string): boolean {
@@ -43,7 +44,15 @@ export const requireSupabaseAuth = createMiddleware({ type: "function" }).server
       ];
       const message = `Missing Supabase environment variable(s): ${missing.join(", ")}. Running in local demo mode without auth enforcement.`;
       console.warn(`[Supabase] ${message}`);
-      return next();
+      // Keep the middleware context shape consistent in demo mode. The local
+      // client makes database-backed actions fail with a clear connection error.
+      return next({
+        context: {
+          supabase: createClient<Database>("http://127.0.0.1:54321", "demo-key"),
+          userId: "demo",
+          claims: {} as JwtPayload,
+        },
+      });
     }
 
     const request = getRequest();

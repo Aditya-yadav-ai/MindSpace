@@ -81,12 +81,12 @@ export function ConnectedServices({ signedIn }: { signedIn: boolean }) {
   const connected = status?.connected === true;
 
   return (
-    <div className="mt-6 rounded-lg bg-panel/70 p-5 ring-1 ring-foreground/5">
+    <div className="mt-6 rounded-lg bg-card p-5 ring-1 ring-border">
       <div className="flex items-center gap-2">
         <ShieldCheck className="size-4 text-primary" />
         <p className="text-sm font-medium">Connected services</p>
       </div>
-      <p className="mt-1 text-xs leading-5 text-foreground/45">
+      <p className="mt-1 text-xs leading-5 text-muted-foreground">
         Google Sign-In lets the Gmail, Calendar and Drive agents read your account and prepare
         drafts, events and files. Nothing writes to your real account without your explicit approval
         first.
@@ -109,13 +109,13 @@ export function ConnectedServices({ signedIn }: { signedIn: boolean }) {
         </p>
       )}
 
-      <div className="mt-4 flex items-center justify-between gap-4 rounded-md bg-background/50 p-3.5 ring-1 ring-foreground/5">
+      <div className="mt-4 flex items-center justify-between gap-4 rounded-md bg-background p-3.5 ring-1 ring-border">
         <div className="min-w-0">
           <p className="text-sm font-medium">
             {connected ? (status.googleEmail ?? "Google account") : "Not connected"}
           </p>
           {connected && (
-            <p className="mt-0.5 truncate text-xs text-foreground/45">
+            <p className="mt-0.5 truncate text-xs text-muted-foreground">
               Gmail · Calendar · Drive{status.expiresSoon ? " · refreshing access shortly" : ""}
             </p>
           )}
@@ -136,17 +136,14 @@ export function ConnectedServices({ signedIn }: { signedIn: boolean }) {
         )}
       </div>
 
-      <div className="mt-4 grid grid-cols-5 gap-1.5 text-center text-[10.5px] text-foreground/50">
+      <div className="mt-4 grid grid-cols-5 gap-1.5 text-center text-[10.5px] text-muted-foreground">
         {GOOGLE_SERVICE_CAPABILITIES.map((service) => (
-          <div
-            key={service.id}
-            className="rounded-md bg-background/40 p-2 ring-1 ring-foreground/5"
-          >
+          <div key={service.id} className="rounded-md bg-background p-2 ring-1 ring-border">
             <p className="truncate font-medium text-foreground/70">{service.label}</p>
-            <p className={cn("mt-1", connected ? "text-positive" : "text-foreground/35")}>
+            <p className={cn("mt-1", connected ? "text-positive" : "text-muted-foreground")}>
               {connected ? "ready" : "not connected"}
             </p>
-            <p className="mt-0.5 text-foreground/35">
+            <p className="mt-0.5 text-muted-foreground">
               {service.writes ? (service.reads ? "read/write" : "write") : "read-only"}
             </p>
           </div>

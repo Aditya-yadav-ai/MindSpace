@@ -1,0 +1,6 @@
+WARNING:__main__:Starting in OFFLINE/MOCK mode: no usable GROQ_API_KEY is configured. Produced results are simulated.
+INFO:__main__:Listening on 127.0.0.1:8765
+INFO:     Started server process [11156]
+INFO:     Waiting for application startup.
+INFO:     Application startup complete.
+INFO:     Uvicorn running on http://127.0.0.1:8765 (Press CTRL+C to quit)

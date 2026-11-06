@@ -9,7 +9,11 @@
     "build:dev": "vite build --mode development",
     "preview": "vite preview",
     "lint": "eslint .",
-    "format": "prettier --write ."
+    "format": "prettier --write .",
+    "build:extension": "node scripts/build-extension.mjs",
+    "build:all": "vite build && node scripts/build-extension.mjs",
+    "test:google": "jiti src/lib/google/__tests__/adapters.test.mjs",
+    "test:extension": "node --test tests/extension_browser_test.mjs"
   },
   "overrides": {
     "rolldown": "1.2.1"

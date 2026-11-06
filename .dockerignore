@@ -1,0 +1,28 @@
+# Build context exclusions. Without this file, `COPY apps/api/ ./` would copy
+# local secrets and virtual environments into the image.
+.git
+.gitignore
+.dockerignore
+
+# Python artefacts
+**/__pycache__
+**/*.py[cod]
+**/*.egg-info
+**/.pytest_cache
+
+# Virtual environments (must never enter the image)
+**/.venv
+**/.venv*/
+**/venv
+
+# Local secrets and env files, but keep the documented example
+**/.env
+**/.env.*
+!**/.env.example
+
+# Front-end artefacts (irrelevant to the Python image)
+node_modules
+.output
+dist
+dist-ssr
+.tanstack

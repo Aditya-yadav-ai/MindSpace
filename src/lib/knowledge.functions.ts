@@ -4,6 +4,7 @@
  * and the grounded RAG question/answer flow.
  */
 import { createServerFn } from "@tanstack/react-start";
+import type { SupabaseClient } from "@supabase/supabase-js";
 import { z } from "zod";
 
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
@@ -55,7 +56,7 @@ export const listDocuments = createServerFn({ method: "GET" })
   });
 
 async function indexDocument(
-  supabase: { from: (table: string) => any },
+  supabase: SupabaseClient,
   userId: string,
   documentId: string,
   text: string,

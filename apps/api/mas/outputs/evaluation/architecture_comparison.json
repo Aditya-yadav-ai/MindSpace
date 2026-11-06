@@ -1,0 +1,178 @@
+{
+  "sequential": {
+    "n_runs": 11,
+    "status_counts": {
+      "blocked": 1,
+      "partial": 10
+    },
+    "error_category_counts": {
+      "guardrail_block": 1,
+      "none": 10
+    },
+    "evidence_rate": 0.9091,
+    "evidence_rate_ci95": [0.6226, 0.9838],
+    "latency_ms": {
+      "n": 11,
+      "mean": 3873.162,
+      "median": 4278.636,
+      "stdev": 2082.43,
+      "min": 6.117,
+      "max": 6614.058,
+      "p95": 6380.818,
+      "mean_ci95": [2719.754, 5016.622]
+    },
+    "quality_score": {
+      "n": 11,
+      "mean": 0.901,
+      "median": 1.0,
+      "stdev": 0.285,
+      "min": 0.05,
+      "max": 1.0,
+      "p95": 1.0,
+      "mean_ci95": [0.728, 1.0]
+    },
+    "mean_source_count": 5.091,
+    "backends": ["duckduckgo", "google_news_rss"],
+    "mean_tool_calls": 0.909,
+    "research_strategy_counts": {
+      "none": 1,
+      "sequential": 10
+    },
+    "mean_queries_issued": 1.7,
+    "max_concurrency": 0,
+    "max_iterations": 0,
+    "mean_delegations": null
+  },
+  "hierarchical": {
+    "n_runs": 11,
+    "status_counts": {
+      "blocked": 1,
+      "partial": 10
+    },
+    "error_category_counts": {
+      "guardrail_block": 1,
+      "none": 10
+    },
+    "evidence_rate": 0.9091,
+    "evidence_rate_ci95": [0.6226, 0.9838],
+    "latency_ms": {
+      "n": 11,
+      "mean": 2617.004,
+      "median": 2434.76,
+      "stdev": 1611.672,
+      "min": 6.744,
+      "max": 6600.706,
+      "p95": 5081.645,
+      "mean_ci95": [1788.063, 3598.726]
+    },
+    "quality_score": {
+      "n": 11,
+      "mean": 0.899,
+      "median": 1.0,
+      "stdev": 0.286,
+      "min": 0.05,
+      "max": 1.0,
+      "p95": 1.0,
+      "mean_ci95": [0.727, 1.0]
+    },
+    "mean_source_count": 4.182,
+    "backends": ["duckduckgo_html", "google_news_rss"],
+    "mean_tool_calls": 0.909,
+    "research_strategy_counts": {
+      "hierarchical": 10,
+      "none": 1
+    },
+    "mean_queries_issued": 1.2,
+    "max_concurrency": 0,
+    "max_iterations": 0,
+    "mean_delegations": 0.2
+  },
+  "parallel": {
+    "n_runs": 11,
+    "status_counts": {
+      "blocked": 1,
+      "partial": 10
+    },
+    "error_category_counts": {
+      "guardrail_block": 1,
+      "none": 10
+    },
+    "evidence_rate": 0.9091,
+    "evidence_rate_ci95": [0.6226, 0.9838],
+    "latency_ms": {
+      "n": 11,
+      "mean": 2765.71,
+      "median": 2689.668,
+      "stdev": 1263.897,
+      "min": 5.013,
+      "max": 5365.293,
+      "p95": 4427.697,
+      "mean_ci95": [2058.003, 3486.297]
+    },
+    "quality_score": {
+      "n": 11,
+      "mean": 0.895,
+      "median": 1.0,
+      "stdev": 0.284,
+      "min": 0.05,
+      "max": 1.0,
+      "p95": 1.0,
+      "mean_ci95": [0.718, 1.0]
+    },
+    "mean_source_count": 5.909,
+    "backends": ["duckduckgo_html", "google_news_rss"],
+    "mean_tool_calls": 0.909,
+    "research_strategy_counts": {
+      "none": 1,
+      "parallel": 10
+    },
+    "mean_queries_issued": 2.0,
+    "max_concurrency": 2,
+    "max_iterations": 0,
+    "mean_delegations": null
+  },
+  "react": {
+    "n_runs": 11,
+    "status_counts": {
+      "blocked": 1,
+      "partial": 10
+    },
+    "error_category_counts": {
+      "guardrail_block": 1,
+      "none": 10
+    },
+    "evidence_rate": 0.9091,
+    "evidence_rate_ci95": [0.6226, 0.9838],
+    "latency_ms": {
+      "n": 11,
+      "mean": 2180.431,
+      "median": 2285.566,
+      "stdev": 1000.83,
+      "min": 3.851,
+      "max": 4101.393,
+      "p95": 3522.119,
+      "mean_ci95": [1607.075, 2729.325]
+    },
+    "quality_score": {
+      "n": 11,
+      "mean": 0.899,
+      "median": 1.0,
+      "stdev": 0.286,
+      "min": 0.05,
+      "max": 1.0,
+      "p95": 1.0,
+      "mean_ci95": [0.727, 1.0]
+    },
+    "mean_source_count": 4.182,
+    "backends": ["duckduckgo_html", "google_news_rss"],
+    "mean_tool_calls": 0.909,
+    "research_strategy_counts": {
+      "none": 1,
+      "react": 10
+    },
+    "mean_queries_issued": 1.2,
+    "max_concurrency": 0,
+    "max_iterations": 2,
+    "mean_delegations": null
+  }
+}

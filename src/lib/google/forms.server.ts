@@ -17,7 +17,7 @@ export async function createForm(
       body: JSON.stringify({ info: { title: input.title, documentTitle: input.title } }),
     },
   );
-  if (input.description.trim()) {
+  if (input.description && input.description.trim()) {
     await googleApiFetch(accessToken, `${BASE}/${created.formId}:batchUpdate`, {
       method: "POST",
       body: JSON.stringify({

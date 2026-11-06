@@ -1,0 +1,9 @@
+{
+  "dataset_version": "mindspace-eval-1.0.0",
+  "created_utc": "2026-10-25T18:02:23.995813+00:00",
+  "case_count": 44,
+  "architectures": ["sequential", "hierarchical", "parallel", "react"],
+  "tool_config": "mcp:web_search,fetch_page,extract_facts",
+  "sha256": "d651e6987e440011ab484bdc29491e5904c44c50ab13e3d7bca6d992cb1143fe",
+  "description": "Matched-block evaluation cases: each block fixes persona, query and tool configuration and is repeated across sequential, hierarchical, parallel and react architectures."
+}

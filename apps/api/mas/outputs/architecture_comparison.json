@@ -1,0 +1,20 @@
+{
+  "architecture_comparison": {
+    "blackboard": {
+      "pattern": "Shared State (Publish/Subscribe)",
+      "reads": 175,
+      "writes": 245,
+      "entries": 0,
+      "pros": ["Decoupled agents", "Full audit trail", "Easy to add new agents"],
+      "cons": ["Single point of contention", "Persistence overhead"]
+    },
+    "p2p": {
+      "pattern": "Direct Peer-to-Peer Messaging",
+      "sends": 0,
+      "reads": 0,
+      "pros": ["Low latency", "No central bottleneck", "Targeted delivery"],
+      "cons": ["Tight coupling", "No shared context", "Harder to audit"]
+    },
+    "verdict": "Blackboard preferred for multi-agent coordination; P2P for urgent targeted alerts"
+  }
+}

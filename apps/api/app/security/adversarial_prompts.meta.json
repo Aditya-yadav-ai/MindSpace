@@ -1,0 +1,28 @@
+{
+  "dataset_version": "1.0.0",
+  "created_utc": "2026-10-25T18:15:41.130067+00:00",
+  "case_count": 44,
+  "sha256": "fe26b81a7ef4f84458539465a0265335b721ef36272d8f92c7c5866110db8dd5",
+  "source": "app/security/adversarial_prompts.jsonl",
+  "categories": ["benign", "exfiltration", "injection", "toxic", "xss"],
+  "vectors": [
+    "base64",
+    "bidi-override",
+    "canonical",
+    "control",
+    "fullwidth",
+    "homoglyph",
+    "hostile",
+    "html-attribute",
+    "html-tag",
+    "iframe",
+    "insult",
+    "leetspeak",
+    "markdown-link",
+    "obfuscated-spacing",
+    "profanity",
+    "secret-in-content",
+    "zero-width"
+  ],
+  "description": "Versioned adversarial prompt and benign-control dataset for the two guardrail layers. Each case declares expected flag/block/sanitise outcomes so false positives and false negatives are measured rather than assumed."
+}

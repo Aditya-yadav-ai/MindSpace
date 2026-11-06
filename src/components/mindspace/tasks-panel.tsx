@@ -15,6 +15,7 @@ import {
   type TaskRecord,
 } from "@/lib/tasks.functions";
 import { cn } from "@/lib/utils";
+import { ViewHeader } from "@/components/mindspace/ui";
 
 export function TasksPanel({ signedIn }: { signedIn: boolean }) {
   const load = useServerFn(listTasks);
@@ -48,11 +49,11 @@ export function TasksPanel({ signedIn }: { signedIn: boolean }) {
     return (
       <div className="mx-auto max-w-3xl">
         <Header />
-        <div className="mt-7 grid min-h-72 place-items-center rounded-lg bg-panel/60 p-8 text-center ring-1 ring-foreground/5">
+        <div className="mt-7 grid min-h-72 place-items-center rounded-lg bg-card p-8 text-center ring-1 ring-border">
           <div>
             <ListTodo className="mx-auto size-6 text-primary" />
             <p className="mt-4 text-sm font-medium">Sign in to keep tasks</p>
-            <p className="mt-1 max-w-sm text-xs leading-5 text-foreground/50">
+            <p className="mt-1 max-w-sm text-xs leading-5 text-muted-foreground">
               Tasks are saved to your account, so this needs a real sign-in rather than the preview.
             </p>
           </div>
@@ -113,19 +114,19 @@ export function TasksPanel({ signedIn }: { signedIn: boolean }) {
 
       <form
         onSubmit={submit}
-        className="mt-6 flex flex-wrap gap-2 rounded-lg bg-panel/60 p-4 ring-1 ring-foreground/5"
+        className="mt-6 flex flex-wrap gap-2 rounded-lg bg-card p-4 ring-1 ring-border"
       >
         <input
           value={title}
           onChange={(event) => setTitle(event.target.value)}
           placeholder="Add a task…"
-          className="h-9 min-w-[12rem] flex-1 rounded-md border border-input bg-background/70 px-3 text-sm outline-none transition focus:border-primary focus:ring-2 focus:ring-primary/15"
+          className="h-9 min-w-[12rem] flex-1 rounded-md border border-input bg-background px-3 text-sm outline-none transition focus:border-primary focus:ring-2 focus:ring-primary/15"
         />
         <input
           value={dueAt}
           onChange={(event) => setDueAt(event.target.value)}
           placeholder="Due (optional)"
-          className="h-9 w-40 rounded-md border border-input bg-background/70 px-3 text-sm outline-none transition focus:border-primary focus:ring-2 focus:ring-primary/15"
+          className="h-9 w-40 rounded-md border border-input bg-background px-3 text-sm outline-none transition focus:border-primary focus:ring-2 focus:ring-primary/15"
         />
         <Button type="submit" size="sm" disabled={busy === "create" || !title.trim()}>
           {busy === "create" ? <LoaderCircle className="animate-spin" /> : <Plus />}
@@ -185,24 +186,24 @@ function TaskGroup({
   empty: string;
 }) {
   return (
-    <div className="rounded-lg bg-panel/60 p-4 ring-1 ring-foreground/5">
+    <div className="rounded-lg bg-card p-4 ring-1 ring-border">
       <h2 className="text-sm font-semibold">
         {title}{" "}
-        <span className="ml-1 font-mono text-[11px] font-normal text-foreground/40">
+        <span className="ml-1 font-mono text-[11px] font-normal text-muted-foreground">
           {items.length}
         </span>
       </h2>
       <div className="mt-3">
         {loading ? (
-          <LoaderCircle className="size-4 animate-spin text-foreground/40" />
+          <LoaderCircle className="size-4 animate-spin text-muted-foreground" />
         ) : items.length === 0 ? (
-          <p className="text-xs leading-5 text-foreground/45">{empty}</p>
+          <p className="text-xs leading-5 text-muted-foreground">{empty}</p>
         ) : (
           <ul className="space-y-1.5">
             {items.map((task) => (
               <li
                 key={task.id}
-                className="flex items-center gap-2.5 rounded-md bg-background/50 p-2.5 ring-1 ring-foreground/5"
+                className="flex items-center gap-2.5 rounded-md bg-background p-2.5 ring-1 ring-border"
               >
                 <button
                   onClick={() => onToggle(task)}
@@ -221,12 +222,12 @@ function TaskGroup({
                   <p
                     className={cn(
                       "truncate text-sm",
-                      task.status === "done" && "text-foreground/40 line-through",
+                      task.status === "done" && "text-muted-foreground line-through",
                     )}
                   >
                     {task.title}
                   </p>
-                  <p className="mt-0.5 flex items-center gap-1.5 text-[10.5px] text-foreground/40">
+                  <p className="mt-0.5 flex items-center gap-1.5 text-[10.5px] text-muted-foreground">
                     {task.due_at && <span>Due {task.due_at}</span>}
                     {task.source === "agent" && (
                       <span className="flex items-center gap-1 text-primary/70">
@@ -239,7 +240,7 @@ function TaskGroup({
                   onClick={() => onRemove(task)}
                   disabled={busy === task.id}
                   aria-label="Delete task"
-                  className="text-foreground/30 hover:text-destructive"
+                  className="text-muted-foreground hover:text-destructive"
                 >
                   {busy === task.id ? (
                     <LoaderCircle className="size-3.5 animate-spin" />
@@ -258,13 +259,10 @@ function TaskGroup({
 
 function Header() {
   return (
-    <div>
-      <p className="font-mono text-[11px] uppercase tracking-[0.16em] text-primary">MindSpace</p>
-      <h1 className="mt-2 font-display text-3xl font-medium">Tasks</h1>
-      <p className="mt-2 max-w-xl text-sm leading-6 text-foreground/60">
-        Real, saved reminders — add them here, or ask the Reminder Agent in Agent Activity to save
-        one from a deadline it finds on a page.
-      </p>
-    </div>
+    <ViewHeader
+      eyebrow="Tasks"
+      title="Tasks"
+      description="Real, saved reminders — add them here, or ask the Reminder Agent in Agent Activity to save one from a deadline it finds on a page."
+    />
   );
 }

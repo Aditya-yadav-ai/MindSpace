@@ -43,7 +43,7 @@ export async function createDocument(
     method: "POST",
     body: JSON.stringify({ title: input.title }),
   });
-  if (input.body.trim()) {
+  if (input.body && input.body.trim()) {
     await googleApiFetch(accessToken, `${BASE}/${created.documentId}:batchUpdate`, {
       method: "POST",
       body: JSON.stringify({

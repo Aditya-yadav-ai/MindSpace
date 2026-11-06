@@ -1,0 +1,29 @@
+{
+  "session": "evaluation_core-p2p",
+  "batch": "core-p2p",
+  "captured_utc": "2026-10-28T04:08:12.029340+00:00",
+  "runs_aggregated": 40,
+  "agents": {
+    "adk_orchestrator": {
+      "steps": 36,
+      "tool_calls": 0,
+      "errors": 0,
+      "total_latency_ms": 111885.169,
+      "total_tokens": null
+    },
+    "market_researcher": {
+      "steps": 36,
+      "tool_calls": 36,
+      "errors": 0,
+      "total_latency_ms": 105843.93,
+      "total_tokens": null
+    },
+    "adk_report_agent": {
+      "steps": 36,
+      "tool_calls": 0,
+      "errors": 0,
+      "total_latency_ms": 269.222,
+      "total_tokens": null
+    }
+  }
+}

@@ -90,11 +90,11 @@ export function MemorySettings({ signedIn }: { signedIn: boolean }) {
   }
 
   return (
-    <div className="mt-6 rounded-lg bg-panel/70 p-5 ring-1 ring-foreground/5">
+    <div className="mt-6 rounded-lg bg-card p-5 ring-1 ring-border">
       <div className="flex items-center justify-between">
         <div>
           <p className="text-sm font-medium">Memory</p>
-          <p className="mt-1 text-xs text-foreground/45">
+          <p className="mt-1 text-xs text-muted-foreground">
             Notes you've saved for MindSpace to draw on later.
           </p>
         </div>
@@ -116,7 +116,7 @@ export function MemorySettings({ signedIn }: { signedIn: boolean }) {
           value={text}
           onChange={(event) => setText(event.target.value)}
           placeholder="Add something to remember…"
-          className="h-9 flex-1 rounded-md border border-input bg-background/70 px-3 text-sm outline-none focus:border-primary focus:ring-2 focus:ring-primary/15"
+          className="h-9 flex-1 rounded-md border border-input bg-background px-3 text-sm outline-none focus:border-primary focus:ring-2 focus:ring-primary/15"
         />
         <Button type="submit" size="sm" disabled={busy === "create" || !text.trim()}>
           {busy === "create" ? <LoaderCircle className="animate-spin" /> : <Plus />}
@@ -125,14 +125,14 @@ export function MemorySettings({ signedIn }: { signedIn: boolean }) {
 
       <div className="mt-3 space-y-1.5">
         {loading ? (
-          <LoaderCircle className="size-3.5 animate-spin text-foreground/40" />
+          <LoaderCircle className="size-3.5 animate-spin text-muted-foreground" />
         ) : items.length === 0 ? (
-          <p className="text-xs text-foreground/40">Nothing saved yet.</p>
+          <p className="text-xs text-muted-foreground">Nothing saved yet.</p>
         ) : (
           items.map((item) => (
             <div
               key={item.id}
-              className="flex items-start gap-2 rounded-md bg-background/50 p-2.5 text-xs ring-1 ring-foreground/5"
+              className="flex items-start gap-2 rounded-md bg-background p-2.5 text-xs ring-1 ring-border"
             >
               <p className="min-w-0 flex-1 leading-5 text-foreground/75">{item.content}</p>
               <button
@@ -141,7 +141,7 @@ export function MemorySettings({ signedIn }: { signedIn: boolean }) {
                 aria-label={item.pinned ? "Unpin" : "Pin"}
                 className={cn(
                   "shrink-0",
-                  item.pinned ? "text-primary" : "text-foreground/25 hover:text-foreground/60",
+                  item.pinned ? "text-primary" : "text-foreground/25 hover:text-muted-foreground",
                 )}
               >
                 <Pin className="size-3.5" fill={item.pinned ? "currentColor" : "none"} />

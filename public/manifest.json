@@ -1,10 +1,47 @@
 {
   "manifest_version": 3,
   "name": "MindSpace",
-  "description": "A focused browser workspace for understanding the web.",
-  "version": "0.1.0",
-  "permissions": ["sidePanel", "storage", "activeTab"],
-  "action": { "default_title": "Open MindSpace" },
-  "side_panel": { "default_path": "/" },
-  "background": { "service_worker": "extension-background.js" }
+  "description": "Screenshot-driven multimodal AI browser assistant with multi-agent orchestration and local intelligence.",
+  "version": "0.3.0",
+  "permissions": [
+    "sidePanel",
+    "storage",
+    "activeTab",
+    "scripting",
+    "tabs",
+    "notifications"
+  ],
+  "host_permissions": [
+    "http://127.0.0.1:8010/*",
+    "http://localhost:8010/*",
+    "http://127.0.0.1:8000/*",
+    "http://localhost:8000/*"
+  ],
+  "action": {
+    "default_title": "Open MindSpace",
+    "default_icon": {
+      "16": "icon-16.png",
+      "48": "icon-48.png"
+    }
+  },
+  "side_panel": {
+    "default_path": "sidepanel.html"
+  },
+  "background": {
+    "service_worker": "extension-background.js"
+  },
+  "commands": {
+    "capture_screenshot": {
+      "suggested_key": {
+        "default": "Alt+B",
+        "mac": "Alt+B"
+      },
+      "description": "Capture screen and activate MindSpace AI assistant"
+    }
+  },
+  "icons": {
+    "16": "icon-16.png",
+    "48": "icon-48.png",
+    "128": "icon-128.png"
+  }
 }
