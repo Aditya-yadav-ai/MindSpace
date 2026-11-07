@@ -250,7 +250,7 @@ async function captureVisibleTabScreenshot() {
 }
 
 chrome.commands.onCommand.addListener(async function (command) {
-  if (command === "capture_screenshot") {
+  if (command === "capture_screenshot" || command === "capture-visible-tab") {
     try {
       var tab = await activeTab();
       if (chrome.sidePanel && chrome.sidePanel.open) {

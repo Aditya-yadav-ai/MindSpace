@@ -71,3 +71,11 @@ dist-extension/
 .env
 .env.local
 apps/api/.env
+
+# Local SQLite databases and runtime output states
+*.db
+*.sqlite
+*.sqlite3
+apps/api/mas/outputs/*.db
+apps/api/mas/outputs/*.sqlite
+

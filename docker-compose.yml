@@ -1,0 +1,61 @@
+services:
+  postgres:
+    image: postgres:16-alpine
+    container_name: mindspace-postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: mindspace
+      POSTGRES_USER: mindspace
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-mindspace_secure_pass_2026}
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U mindspace -d mindspace"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  mindspace-api:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: mindspace-agent-api
+    restart: unless-stopped
+    depends_on:
+      postgres:
+        condition: service_healthy
+    ports:
+      - "8010:8010"
+    environment:
+      - PORT=8010
+      - HOST=0.0.0.0
+      - ENVIRONMENT=production
+      - DATABASE_URL=postgresql://mindspace:${POSTGRES_PASSWORD:-mindspace_secure_pass_2026}@postgres:5432/mindspace
+      - MINDSPACE_API_KEY=${MINDSPACE_API_KEY:-}
+      - JWT_SECRET=${JWT_SECRET:-}
+      - JWT_ISSUER=${JWT_ISSUER:-}
+      - JWT_AUDIENCE=${JWT_AUDIENCE:-authenticated}
+      - GROQ_API_KEY=${GROQ_API_KEY:-}
+      - MINDSPACE_OFFLINE=${MINDSPACE_OFFLINE:-1}
+      - RATE_LIMIT_PER_MINUTE=${RATE_LIMIT_PER_MINUTE:-60}
+      - ALLOWED_EXTENSION_IDS=${ALLOWED_EXTENSION_IDS:-}
+      - CORS_ORIGINS=${CORS_ORIGINS:-http://localhost:3000,http://localhost:8080}
+    healthcheck:
+      test:
+        [
+          "CMD",
+          "python",
+          "-c",
+          "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8010/health')",
+        ]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+    volumes:
+      - mas-outputs:/app/mas/outputs
+
+volumes:
+  postgres-data:
+  mas-outputs:

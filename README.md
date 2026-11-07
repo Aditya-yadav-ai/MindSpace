@@ -181,6 +181,68 @@ Open [http://localhost:8080](http://localhost:8080) in your browser.
 
 ## 🔒 Security & Privacy Architecture
 
+## 🔒 Security & Privacy Architecture
+
 - **Server Functions Only for Credentials**: API keys (`LOVABLE_API_KEY`, `GOOGLE_CLIENT_SECRET`) are strictly kept server-side inside TanStack Start server functions and Nitro handlers.
 - **Safe Agent Sandboxing**: Unattended automation runs require explicit user consent and whitelisting of consequential tools.
 - **Zero-Storage Reasoning**: Model responses disable OpenAI reasoning retention (`store: false`) where applicable to maintain strict user privacy.
+- **Fail-Closed Authentication**: In production mode, all endpoints strictly require authenticated credentials and reject unauthenticated requests.
+- **SSRF & DNS Rebinding Immunity**: MCP research endpoints validate IP addresses on the physical TCP socket before connection, neutralizing TOCTOU rebinding.
+
+Important:
+
+- Do not commit `.env`, `.env.local` or any real secrets.
+- Keep all credentials in your local environment or secret manager.
+
+## Supabase setup
+
+1. Create a Supabase project
+2. Enable Google provider in Authentication → Providers
+3. Add your Google OAuth client ID and secret
+4. Configure redirect URLs for local development and production
+
+Recommended local redirect values:
+
+```text
+http://localhost:8080
+https://your-domain.com
+```
+
+And for Supabase callback:
+
+```text
+https://<project-ref>.supabase.co/auth/v1/callback
+```
+
+## Google OAuth setup
+
+1. Create a Google Cloud OAuth client (Web application)
+2. Add authorized JavaScript origins:
+   - `http://localhost:3000`
+   - `http://localhost:8080`
+3. Add authorized redirect URIs:
+   - `http://localhost:3000/api/google/oauth-callback`
+   - `https://<project-ref>.supabase.co/auth/v1/callback`
+
+## Chrome extension usage
+
+Build the extension package with `npm run build:extension`. In Chrome, open `chrome://extensions`, enable Developer mode, choose **Load unpacked**, and select `dist-extension`. The `Alt+B` command captures the visible tab, opens MindSpace, and shows the screenshot in Page Context.
+
+Chrome-restricted pages may not provide readable page text. The screenshot is kept in extension session storage and is not automatically sent to the AI.
+
+## Build
+
+```bash
+npm run build
+```
+
+## Security notes
+
+- Never commit real API keys or secrets
+- Use `.env.local` only for local development
+- Keep production credentials in a secure hosting environment
+- Prefer environment variables over hard-coded values
+
+## License
+
+This project is currently configured for local / personal development use unless otherwise specified by the project owner.
