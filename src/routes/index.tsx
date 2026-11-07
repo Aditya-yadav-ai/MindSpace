@@ -352,8 +352,13 @@ export function Workspace({
   };
 
   async function signOut() {
-    if (session) await supabase.auth.signOut();
-    else onExitDemo();
+    try {
+      if (session) await supabase.auth.signOut();
+      else onExitDemo();
+    } catch (e) {
+      console.warn("Sign out encountered network error, resetting locally:", e);
+      onExitDemo();
+    }
   }
 
   function selectView(next: MindSpaceView) {

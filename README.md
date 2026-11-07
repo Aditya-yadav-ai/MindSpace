@@ -55,8 +55,9 @@
 
 ### 7. 🧩 Chrome Extension Integration (Manifest V3)
 
-- Scaffolding located in `public/manifest.json`.
-- Uses `sidePanel`, `activeTab`, `scripting`, and `storage` permissions to communicate with the local MindSpace server (`http://localhost:8000` / `http://localhost:8080`).
+- Unpacked extension bundle generated in `dist-extension/` via `npm run build:extension`.
+- Uses `sidePanel`, `activeTab`, `scripting`, and `storage` permissions to communicate with the local MindSpace server (`http://127.0.0.1:8010` / `http://localhost:8080`).
+- Shortcut: `Alt+B` captures visible viewport screenshot and page DOM context. Proactively handles restricted browser URLs (`chrome://`, `edge://`, `about:`, `devtools:`, Web Store) with clean user-facing guidance.
 
 ---
 
@@ -67,11 +68,11 @@
 | **Framework**               | [React 19](https://react.dev/), [TanStack Start](https://tanstack.com/start), [TanStack Router](https://tanstack.com/router)    |
 | **Build & Bundling**        | [Vite 8](https://vitejs.dev/), Nitro Server Engine                                                                              |
 | **Styling & Components**    | [Tailwind CSS v4](https://tailwindcss.com/), [Radix UI](https://www.radix-ui.com/), [Lucide React](https://lucide.dev/), Motion |
-| **AI / LLM Orchestration**  | [Vercel AI SDK](https://sdk.vercel.ai/), `@ai-sdk/openai`, Lovable AI Gateway (`openai/gpt-6-astra`)                            |
+| **AI / LLM Orchestration**  | [FastAPI](https://fastapi.tiangolo.com/), [LiteLLM](https://litellm.ai/), [CrewAI](https://crewai.com/), Google ADK, MCP, A2A |
 | **Streaming & Rendering**   | Streamdown (Markdown, Math/KaTeX, Mermaid diagramming, CJK)                                                                     |
-| **Database & Vector Store** | [Supabase](https://supabase.com/) (PostgreSQL 14.5+ with `pgvector`, Row Level Security)                                        |
-| **Authentication**          | Supabase Auth (Session management, OAuth providers)                                                                             |
-| **Browser Extension**       | Chrome Manifest V3 (`sidePanel`, Service Worker)                                                                                |
+| **Database & Multi-Tenancy**| PostgreSQL 16 (`psycopg_pool` connection pool) with SQLite fallback, compound key isolation `(tenant_id, user_id)`            |
+| **Authentication & Crypto** | Cryptographic PyJWT (`HS256`/`RS256`), AES-256-GCM token encryption, Supabase Auth                                              |
+| **Browser Extension**       | Chrome Manifest V3 Side Panel (`dist-extension/`), real-browser headless test verified                                          |
 
 ---
 
@@ -243,6 +244,53 @@ npm run build
 - Keep production credentials in a secure hosting environment
 - Prefer environment variables over hard-coded values
 
-## License
+## Database Administration & Backups
 
-This project is currently configured for local / personal development use unless otherwise specified by the project owner.
+MindSpace includes a database management utility:
+
+```powershell
+# Show migration and connectivity status
+python -m scripts.db_admin status
+
+# Apply schema migrations
+python -m scripts.db_admin migrate
+
+# Create point-in-time database backup
+python -m scripts.db_admin backup
+
+# Restore database from backup archive
+python -m scripts.db_admin restore --file backups/mindspace_backup_YYYYMMDD_HHMMSS.sqlite
+```
+
+## Testing & Quality Assurance
+
+```powershell
+# Run backend pytest test suite (275+ tests)
+$env:PYTHONPATH = "apps/api"
+pytest apps/api/tests -v
+
+# Run Google Workspace capability contracts
+npm run test:google
+
+# Run real Chrome extension headless verification
+npm run test:extension
+
+# Verify TypeScript and ESLint code standards
+npm run lint
+
+# Compile production extension package
+npm run build:extension
+```
+
+## Security notes
+
+- Never commit real API keys or secrets
+- Use `.env.local` or environment variables for credentials
+- Keep production credentials in a secure secrets store
+- All untrusted DOM content is strictly delimited and scanned for injection vectors
+- Model Context Protocol research client enforces physical socket-level SSRF blocking
+
+## License & Third-Party Notices
+
+Licensed under the **Apache License, Version 2.0**. See the [LICENSE](LICENSE) file for complete details.  
+Third-party dependency attributions and open-source licenses are documented in [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md).

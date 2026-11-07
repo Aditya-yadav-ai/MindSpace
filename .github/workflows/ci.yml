@@ -1,0 +1,94 @@
+name: MindSpace CI/CD Pipeline
+
+on:
+  push:
+    branches: [ main, master ]
+  pull_request:
+    branches: [ main, master ]
+
+jobs:
+  frontend-extension:
+    name: Frontend UI & Chrome MV3 Extension
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js 20
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Verify code style & linting
+        run: npm run lint
+
+      - name: Run Google Workspace adapter test suite
+        run: npm run test:google
+
+      - name: Run headless Chrome extension tests
+        run: npm run test:extension
+
+      - name: Build unpacked extension (dist-extension)
+        run: npm run build:extension
+
+      - name: Build TanStack Start SSR web application
+        run: npm run build
+
+      - name: Verify extension build artifacts
+        run: |
+          test -f dist-extension/manifest.json
+          test -f dist-extension/extension-background.js
+          test -f dist-extension/sidepanel.html
+          test -f dist-extension/content-script.js
+          test ! -f dist-extension/_headers
+
+  backend-api:
+    name: Python FastAPI & Multi-Agent Tests
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python 3.12
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+          cache: 'pip'
+
+      - name: Install backend dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r apps/api/requirements.txt pytest pytest-asyncio pytest-subtests
+
+      - name: Run database migrations check
+        env:
+          PYTHONPATH: apps/api
+        run: python -m scripts.db_admin migrate
+
+      - name: Run Pytest test suite
+        env:
+          PYTHONPATH: apps/api
+        run: pytest apps/api/tests -v
+
+  security-audit:
+    name: Dependency Security & Vulnerability Scan
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js 20
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - name: Run npm audit check
+        run: npm audit --audit-level=high
+
+      - name: Check for unredacted secrets & conflict markers
+        run: |
+          ! grep -rnw . -e '<<<<<<<' -e '>>>>>>>' --exclude-dir={.git,node_modules,.venv}

@@ -90,6 +90,34 @@ class RequestIdMiddleware(BaseHTTPMiddleware):
         return response
 
 
+MAX_REQUEST_BODY_BYTES = 25 * 1024 * 1024  # 25 MB payload limit
+START_TIME = time.time()
+
+
+class MaxBodySizeMiddleware(BaseHTTPMiddleware):
+    """Enforce payload size limits to protect against memory exhaustion."""
+
+    async def dispatch(self, request: Request, call_next):  # type: ignore[override]
+        content_length = request.headers.get("content-length")
+        if content_length:
+            try:
+                if int(content_length) > MAX_REQUEST_BODY_BYTES:
+                    return JSONResponse(
+                        status_code=413,
+                        content={
+                            "error": {
+                                "code": "payload_too_large",
+                                "message": f"Payload exceeds maximum allowed size of {MAX_REQUEST_BODY_BYTES // (1024 * 1024)}MB.",
+                                "retryable": False,
+                                "request_id": request.headers.get("X-Request-ID", ""),
+                            }
+                        },
+                    )
+            except ValueError:
+                pass
+        return await call_next(request)
+
+
 def _error(
     status: int, code: str, message: str, *, retryable: bool = False, headers: dict[str, str] | None = None
 ) -> JSONResponse:
@@ -150,6 +178,7 @@ def create_app() -> FastAPI:
         description="Browser page assistant and multi-agent research service.",
     )
     application.add_middleware(RequestIdMiddleware)
+    application.add_middleware(MaxBodySizeMiddleware)
 
     cors_origins = [o.strip() for o in settings.cors_origins.split(",") if o.strip()]
     allowed_ids = [i.strip() for i in settings.allowed_extension_ids.split(",") if i.strip()]
@@ -230,6 +259,26 @@ def create_app() -> FastAPI:
             "checks": {"config": "ok"},
         }
 
+    @application.get("/v1/diagnostics")
+    def diagnostics(request: Request) -> dict[str, Any]:
+        """Operational monitoring and health diagnostics probe."""
+        user = _check_auth(request)
+        state = resolve_runtime()
+        uptime = round(time.time() - START_TIME, 2)
+        import os
+        return {
+            "status": "healthy",
+            "service": settings.service_name,
+            "uptime_seconds": uptime,
+            "runtime_mode": state.mode,
+            "mock": state.mode != "live",
+            "tenant_id": user.tenant_id,
+            "user_id": user.user_id,
+            "database": db.get_health_status(),
+            "pid": os.getpid(),
+            "applied_migrations": [m["version"] for m in db.get_applied_migrations()],
+        }
+
     @application.post("/v1/context", response_model=ContextIngestResponse)
     def ingest_context(
         request: Request,
@@ -288,6 +337,23 @@ def create_app() -> FastAPI:
         target_user = _client_id(client) if (user.is_service and client) else user.user_id
         context_store.clear_client(user.tenant_id, target_user)
         return {"cleared": True}
+
+    @application.delete("/v1/user/data")
+    def purge_user_data_endpoint(
+        request: Request,
+        client: Annotated[str | None, Header(alias=CLIENT_ID_HEADER)] = None,
+    ) -> dict[str, Any]:
+        """GDPR Right to Erasure: completely purge all user data across all tables."""
+        user = _check_auth(request)
+        target_user = _client_id(client) if (user.is_service and client) else user.user_id
+        counts = db.purge_user_data(user.tenant_id, target_user)
+        context_store.clear_client(user.tenant_id, target_user)
+        return {
+            "purged": True,
+            "tenant_id": user.tenant_id,
+            "user_id": target_user,
+            "records_deleted": counts,
+        }
 
     @application.post("/v1/assist", response_model=AssistResponse)
     def assist(

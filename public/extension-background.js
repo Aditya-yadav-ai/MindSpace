@@ -118,12 +118,33 @@ async function apiFetch(path, options) {
   }
 }
 
+function isRestrictedUrl(url) {
+  if (!url) return true;
+  return (
+    /^(chrome|chrome-extension|moz-extension|edge|about|devtools|view-source):/i.test(url) ||
+    /chrome\.google\.com\/webstore|chromewebstore\.google\.com/i.test(url)
+  );
+}
+
 async function captureActiveTab() {
   var tab;
   try {
     tab = await activeTab();
   } catch (error) {
     return { ok: false, reason: "no_tab", message: error.message };
+  }
+
+  if (isRestrictedUrl(tab.url)) {
+    return {
+      ok: false,
+      reason: "restricted_url",
+      message:
+        "MindSpace cannot capture internal browser pages or the Web Store (" +
+        (tab.url || "restricted") +
+        ") for security and privacy reasons.",
+      url: tab.url || "",
+      title: tab.title || "",
+    };
   }
 
   var result;

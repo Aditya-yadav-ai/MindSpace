@@ -232,3 +232,4 @@ class JwtAndMultiTenancyTests(unittest.TestCase):
             self.assertEqual(act_bob["user_id"], "bob-user-id")
             for ev in act_bob["blackboard_events"]:
                 self.assertNotEqual(ev.get("details", {}).get("url"), "https://alpha.com")
+

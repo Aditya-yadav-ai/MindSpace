@@ -16,7 +16,10 @@
     "test:extension": "node --test tests/extension_browser_test.mjs"
   },
   "overrides": {
-    "rolldown": "1.2.1"
+    "rolldown": "1.2.1",
+    "axios": "^1.20.0",
+    "follow-redirects": "^1.15.11",
+    "form-data": "^4.0.6"
   },
   "dependencies": {
     "@ai-sdk/openai": "^4.0.69",

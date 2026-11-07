@@ -87,10 +87,16 @@ class DatabaseManager:
                     conn.close()
 
     def run_migrations(self) -> None:
-        """Run idempotent database migrations with proper indexes and constraints."""
+        """Run idempotent database migrations with proper indexes, constraints, and version tracking."""
         with self.connection() as conn:
             if self.is_postgres:
                 conn.execute("""
+                    CREATE TABLE IF NOT EXISTS schema_migrations (
+                        version TEXT PRIMARY KEY,
+                        applied_at TIMESTAMPTZ DEFAULT NOW(),
+                        description TEXT
+                    );
+
                     CREATE TABLE IF NOT EXISTS user_contexts (
                         tenant_id TEXT NOT NULL,
                         user_id TEXT NOT NULL,
@@ -139,9 +145,19 @@ class DatabaseManager:
                     );
                     CREATE INDEX IF NOT EXISTS idx_p2p_tenant_user_corr 
                         ON p2p_messages_store(tenant_id, user_id, correlation_id);
+
+                    INSERT INTO schema_migrations (version, description)
+                    VALUES ('001_core_schema', 'Initial multi-tenant schema with compound keys')
+                    ON CONFLICT (version) DO NOTHING;
                 """)
             else:
                 conn.executescript("""
+                    CREATE TABLE IF NOT EXISTS schema_migrations (
+                        version TEXT PRIMARY KEY,
+                        applied_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                        description TEXT
+                    );
+
                     CREATE TABLE IF NOT EXISTS user_contexts (
                         tenant_id TEXT NOT NULL,
                         user_id TEXT NOT NULL,
@@ -188,6 +204,9 @@ class DatabaseManager:
                     );
                     CREATE INDEX IF NOT EXISTS idx_p2p_tenant_user_corr 
                         ON p2p_messages_store(tenant_id, user_id, correlation_id);
+
+                    INSERT OR IGNORE INTO schema_migrations (version, description)
+                    VALUES ('001_core_schema', 'Initial multi-tenant schema with compound keys');
                 """)
         logger.info("Database schema migrations verified and active.")
 
@@ -409,5 +428,149 @@ class DatabaseManager:
                 })
             return events
 
+    # ── USER DATA LIFECYCLE & GDPR PURGE ────────────────────────────────────
+
+    def purge_user_data(self, tenant_id: str, user_id: str) -> dict[str, int]:
+        """Completely purge all context, audit logs, and P2P messages for a user (GDPR Right to Erasure)."""
+        purged = {"user_contexts": 0, "mas_audit_logs": 0, "p2p_messages_store": 0}
+        with self.connection() as conn:
+            param_ph = "%s" if self.is_postgres else "?"
+            
+            # 1. Purge user contexts
+            cursor = conn.execute(
+                f"DELETE FROM user_contexts WHERE tenant_id = {param_ph} AND user_id = {param_ph}",
+                (tenant_id, user_id),
+            )
+            purged["user_contexts"] = getattr(cursor, "rowcount", 0) or 0
+
+            # 2. Purge audit logs
+            cursor = conn.execute(
+                f"DELETE FROM mas_audit_logs WHERE tenant_id = {param_ph} AND user_id = {param_ph}",
+                (tenant_id, user_id),
+            )
+            purged["mas_audit_logs"] = getattr(cursor, "rowcount", 0) or 0
+
+            # 3. Purge P2P messages
+            cursor = conn.execute(
+                f"DELETE FROM p2p_messages_store WHERE tenant_id = {param_ph} AND user_id = {param_ph}",
+                (tenant_id, user_id),
+            )
+            purged["p2p_messages_store"] = getattr(cursor, "rowcount", 0) or 0
+
+        logger.info("Purged user data for tenant=%s user=%s: %s", tenant_id, user_id, purged)
+        return purged
+
+    # ── MIGRATIONS & VERSIONING ──────────────────────────────────────────────
+
+    def get_applied_migrations(self) -> list[dict[str, Any]]:
+        """Return list of applied database schema migrations."""
+        with self.connection() as conn:
+            cursor = conn.execute("SELECT version, applied_at, description FROM schema_migrations ORDER BY version ASC")
+            rows = cursor.fetchall()
+            results = []
+            for r in rows:
+                if self.is_postgres:
+                    results.append({"version": r[0], "applied_at": str(r[1]), "description": r[2]})
+                else:
+                    results.append({"version": r["version"], "applied_at": str(r["applied_at"]), "description": r["description"]})
+            return results
+
+    # ── BACKUP & RESTORE ─────────────────────────────────────────────────────
+
+    def backup_database(self, destination_dir: str | Path | None = None) -> str:
+        """Create a point-in-time backup of the database."""
+        import shutil
+        target_dir = Path(destination_dir) if destination_dir else Path(__file__).resolve().parent.parent / "backups"
+        target_dir.mkdir(parents=True, exist_ok=True)
+        timestamp = datetime.now(timezone.utc).strftime("%Y%m%d_%H%M%S")
+
+        if not self.is_postgres:
+            backup_file = target_dir / f"mindspace_backup_{timestamp}.sqlite"
+            with self._lock:
+                with self.connection() as conn:
+                    # SQLite backup API
+                    backup_conn = sqlite3.connect(str(backup_file))
+                    conn.backup(backup_conn)
+                    backup_conn.close()
+            logger.info("Created SQLite database backup at %s", backup_file)
+            return str(backup_file)
+        else:
+            # Export structured table dumps for PostgreSQL
+            backup_file = target_dir / f"mindspace_pg_backup_{timestamp}.json"
+            dump_data: dict[str, list[dict[str, Any]]] = {}
+            with self.connection() as conn:
+                for table in ["user_contexts", "mas_audit_logs", "p2p_messages_store", "schema_migrations"]:
+                    cursor = conn.execute(f"SELECT * FROM {table}")
+                    cols = [desc[0] for desc in cursor.description]
+                    rows = cursor.fetchall()
+                    table_rows = []
+                    for row in rows:
+                        row_dict = {}
+                        for i, col in enumerate(cols):
+                            val = row[i]
+                            if isinstance(val, (datetime, Path)):
+                                val = str(val)
+                            row_dict[col] = val
+                        table_rows.append(row_dict)
+                    dump_data[table] = table_rows
+            with open(backup_file, "w", encoding="utf-8") as fp:
+                json.dump(dump_data, fp, indent=2, default=str)
+            logger.info("Created PostgreSQL table export backup at %s", backup_file)
+            return str(backup_file)
+
+    def restore_database(self, backup_file: str | Path) -> bool:
+        """Restore database state from a backup file."""
+        import shutil
+        file_path = Path(backup_file)
+        if not file_path.exists():
+            raise FileNotFoundError(f"Backup file not found: {backup_file}")
+
+        if not self.is_postgres:
+            with self._lock:
+                # Copy backup file over current SQLite file
+                shutil.copy2(str(file_path), str(self._sqlite_path))
+            self.run_migrations()
+            logger.info("Restored SQLite database from %s", file_path)
+            return True
+        else:
+            with open(file_path, "r", encoding="utf-8") as fp:
+                dump_data = json.load(fp)
+            with self.connection() as conn:
+                for table, rows in dump_data.items():
+                    if not rows:
+                        continue
+                    cols = list(rows[0].keys())
+                    col_str = ", ".join(cols)
+                    ph_str = ", ".join(["%s"] * len(cols))
+                    for row in rows:
+                        vals = [row.get(c) for c in cols]
+                        conn.execute(
+                            f"INSERT INTO {table} ({col_str}) VALUES ({ph_str}) ON CONFLICT DO NOTHING",
+                            tuple(vals),
+                        )
+            logger.info("Restored PostgreSQL database tables from %s", file_path)
+            return True
+
+    def get_health_status(self) -> dict[str, Any]:
+        """Return connectivity and engine health metrics."""
+        try:
+            with self.connection() as conn:
+                conn.execute("SELECT 1")
+            return {
+                "status": "healthy",
+                "engine": "postgresql" if self.is_postgres else "sqlite",
+                "is_postgres": self.is_postgres,
+                "connected": True,
+            }
+        except Exception as e:
+            return {
+                "status": "unhealthy",
+                "engine": "postgresql" if self.is_postgres else "sqlite",
+                "is_postgres": self.is_postgres,
+                "connected": False,
+                "error": str(e),
+            }
+
 
 db = DatabaseManager()
+

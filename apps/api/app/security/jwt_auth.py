@@ -191,3 +191,4 @@ def authenticate_request(request: Request) -> AuthUser:
         role="developer",
         is_service=False,
     )
+
