@@ -55,11 +55,47 @@ class Settings(BaseSettings):
     port: int = Field(default=DEFAULT_PORT, ge=1, le=65535)
     host: str = Field(default="127.0.0.1")
     service_name: str = Field(default=DEFAULT_SERVICE_NAME)
+    environment: str = Field(
+        default="development",
+        validation_alias=AliasChoices("MINDSPACE_ENV", "ENVIRONMENT", "NODE_ENV"),
+    )
+    api_key: str = Field(
+        default="",
+        validation_alias=AliasChoices("MINDSPACE_API_KEY", "API_KEY"),
+    )
+    allowed_extension_ids: str = Field(
+        default="",
+        validation_alias=AliasChoices("ALLOWED_EXTENSION_IDS", "MINDSPACE_ALLOWED_EXTENSIONS"),
+    )
+    rate_limit_per_minute: int = Field(
+        default=60,
+        validation_alias=AliasChoices("RATE_LIMIT_PER_MINUTE", "MINDSPACE_RATE_LIMIT"),
+    )
     groq_api_key: str = Field(default="")
     model: str = Field(default="groq/llama-3.1-8b-instant")
     vision_model: str = Field(default="groq/llama-3.2-11b-vision-preview")
     llm_timeout_seconds: float = Field(default=25.0, gt=0, le=120)
     cors_origins: str = Field(default="")
+    database_url: str = Field(
+        default="",
+        validation_alias=AliasChoices("DATABASE_URL", "MINDSPACE_DATABASE_URL", "POSTGRES_URL"),
+    )
+    jwt_secret: str = Field(
+        default="",
+        validation_alias=AliasChoices("JWT_SECRET", "SUPABASE_JWT_SECRET"),
+    )
+    jwt_issuer: str = Field(
+        default="",
+        validation_alias=AliasChoices("JWT_ISSUER", "SUPABASE_JWT_ISSUER"),
+    )
+    jwt_audience: str = Field(
+        default="authenticated",
+        validation_alias=AliasChoices("JWT_AUDIENCE", "SUPABASE_JWT_AUDIENCE"),
+    )
+    redis_url: str = Field(
+        default="",
+        validation_alias=AliasChoices("REDIS_URL", "MINDSPACE_REDIS_URL"),
+    )
     # Explicit operator switch: MINDSPACE_OFFLINE=1 forces mock mode,
     # MINDSPACE_OFFLINE=0 still refuses to run live without a usable key.
     offline_mode: bool | None = Field(

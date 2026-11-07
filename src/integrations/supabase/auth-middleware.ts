@@ -42,10 +42,14 @@ export const requireSupabaseAuth = createMiddleware({ type: "function" }).server
         ...(!SUPABASE_URL ? ["SUPABASE_URL"] : []),
         ...(!SUPABASE_PUBLISHABLE_KEY ? ["SUPABASE_PUBLISHABLE_KEY"] : []),
       ];
-      const message = `Missing Supabase environment variable(s): ${missing.join(", ")}. Running in local demo mode without auth enforcement.`;
-      console.warn(`[Supabase] ${message}`);
-      // Keep the middleware context shape consistent in demo mode. The local
-      // client makes database-backed actions fail with a clear connection error.
+      const message = `Missing Supabase environment variable(s): ${missing.join(", ")}.`;
+      if (process.env.NODE_ENV === "production") {
+        throw new Error(
+          `[Security Error] ${message} Authentication must fail closed in production.`,
+        );
+      }
+      console.warn(`[Supabase] ${message} Running in local demo mode without auth enforcement.`);
+      // Keep the middleware context shape consistent in local demo mode.
       return next({
         context: {
           supabase: createClient<Database>("http://127.0.0.1:54321", "demo-key"),

@@ -15,4 +15,3 @@ export function setResponseHeader() {}
 export function getCookie() {
   return undefined;
 }
-

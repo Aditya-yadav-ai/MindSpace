@@ -15,10 +15,11 @@ client can never mistake simulated output for a real model response.
 from __future__ import annotations
 
 import logging
+import re
 import time
 import uuid
 from contextvars import ContextVar
-from typing import Annotated
+from typing import Annotated, Any
 
 from fastapi import FastAPI, Header, HTTPException, Request
 from fastapi.exceptions import RequestValidationError
@@ -28,6 +29,7 @@ from starlette.middleware.base import BaseHTTPMiddleware
 
 from app.config import settings
 from app.context_store import context_store
+from app.database import db
 from app.guardrails import (
     MAX_UNTRUSTED_CHARS,
     check_question,
@@ -37,6 +39,7 @@ from app.guardrails import (
 )
 from app.llm import LLMError, generate
 from app.prompts import PROMPT_VERSION, build_messages
+from app.rate_limiter import rate_limiter
 from app.runtime import resolve_runtime
 from app.schemas import (
     AssistRequest,
@@ -53,6 +56,7 @@ from app.schemas import (
     ScreenshotResponse,
     SourceRef,
 )
+from app.security.jwt_auth import AuthUser, authenticate_request
 from mas.agents.vision_agent import vision_agent
 
 logger = logging.getLogger(__name__)
@@ -86,7 +90,9 @@ class RequestIdMiddleware(BaseHTTPMiddleware):
         return response
 
 
-def _error(status: int, code: str, message: str, *, retryable: bool = False) -> JSONResponse:
+def _error(
+    status: int, code: str, message: str, *, retryable: bool = False, headers: dict[str, str] | None = None
+) -> JSONResponse:
     envelope = ErrorEnvelope(
         error=ErrorDetail(
             code=code,
@@ -95,7 +101,7 @@ def _error(status: int, code: str, message: str, *, retryable: bool = False) -> 
             request_id=request_id_ctx.get(),
         )
     )
-    return JSONResponse(status_code=status, content=envelope.model_dump())
+    return JSONResponse(status_code=status, content=envelope.model_dump(), headers=headers)
 
 
 def _client_id(value: str | None) -> str:
@@ -107,6 +113,27 @@ def _client_id(value: str | None) -> str:
     if not all(ch.isalnum() or ch in "-_.:@" for ch in cleaned):
         return DEFAULT_CLIENT_ID
     return cleaned
+
+
+def _check_auth(request: Request) -> AuthUser:
+    """Enforce API authentication via JWT or Service API Key, returning AuthUser."""
+    user = authenticate_request(request)
+    request.state.auth_user = user
+    return user
+
+
+def _check_rate_limit(request: Request, client_id: str) -> None:
+    """Check sliding window rate limit for this client or IP."""
+    if settings.environment.strip().lower() == "test":
+        return
+    client_ip = request.client.host if request.client else "unknown"
+    key = f"{client_ip}:{client_id}"
+    allowed, retry_after = rate_limiter.is_allowed(key, max_requests=settings.rate_limit_per_minute)
+    if not allowed:
+        raise HTTPException(
+            status_code=429,
+            detail=f"Rate limit of {settings.rate_limit_per_minute} req/min exceeded. Retry after {retry_after}s.",
+        )
 
 
 def create_app() -> FastAPI:
@@ -123,15 +150,40 @@ def create_app() -> FastAPI:
         description="Browser page assistant and multi-agent research service.",
     )
     application.add_middleware(RequestIdMiddleware)
-    application.add_middleware(
-        CORSMiddleware,
-        allow_origin_regex=CORS_ORIGIN_REGEX,
-        allow_credentials=False,
-        allow_methods=["GET", "POST", "DELETE", "OPTIONS"],
-        allow_headers=["Content-Type", "X-Request-ID", CLIENT_ID_HEADER],
-        expose_headers=["X-Request-ID"],
-        max_age=600,
-    )
+
+    cors_origins = [o.strip() for o in settings.cors_origins.split(",") if o.strip()]
+    allowed_ids = [i.strip() for i in settings.allowed_extension_ids.split(",") if i.strip()]
+
+    is_prod = settings.environment.strip().lower() == "production"
+    if is_prod:
+        if allowed_ids:
+            cors_regex = r"^chrome-extension://(" + "|".join(re.escape(i) for i in allowed_ids) + r")$"
+        else:
+            cors_regex = None
+    else:
+        cors_regex = CORS_ORIGIN_REGEX
+
+    cors_kwargs: dict[str, Any] = {
+        "allow_credentials": False,
+        "allow_methods": ["GET", "POST", "DELETE", "OPTIONS"],
+        "allow_headers": [
+            "Content-Type",
+            "X-Request-ID",
+            CLIENT_ID_HEADER,
+            "X-API-Key",
+            "Authorization",
+        ],
+        "expose_headers": ["X-Request-ID", "Retry-After"],
+        "max_age": 600,
+    }
+    if cors_regex:
+        cors_kwargs["allow_origin_regex"] = cors_regex
+    if cors_origins:
+        cors_kwargs["allow_origins"] = cors_origins
+    elif not cors_regex:
+        cors_kwargs["allow_origins"] = []
+
+    application.add_middleware(CORSMiddleware, **cors_kwargs)
 
     @application.exception_handler(RequestValidationError)
     async def _validation_handler(_: Request, exc: RequestValidationError) -> JSONResponse:
@@ -143,7 +195,18 @@ def create_app() -> FastAPI:
 
     @application.exception_handler(HTTPException)
     async def _http_handler(_: Request, exc: HTTPException) -> JSONResponse:
-        return _error(exc.status_code, "http_error", str(exc.detail))
+        code_name = "http_error"
+        retryable = False
+        headers: dict[str, str] = {}
+        if exc.status_code == 429:
+            code_name = "rate_limit_exceeded"
+            retryable = True
+            headers["Retry-After"] = "60"
+        elif exc.status_code == 401:
+            code_name = "unauthorized"
+        elif exc.status_code == 403:
+            code_name = "forbidden"
+        return _error(exc.status_code, code_name, str(exc.detail), retryable=retryable, headers=headers)
 
     @application.exception_handler(Exception)
     async def _unhandled_handler(_: Request, exc: Exception) -> JSONResponse:
@@ -169,9 +232,13 @@ def create_app() -> FastAPI:
 
     @application.post("/v1/context", response_model=ContextIngestResponse)
     def ingest_context(
+        request: Request,
         payload: ContextIngestRequest,
         client: Annotated[str | None, Header(alias=CLIENT_ID_HEADER)] = None,
     ) -> ContextIngestResponse:
+        user = _check_auth(request)
+        target_user = _client_id(client) if (user.is_service and client) else user.user_id
+        _check_rate_limit(request, target_user)
         context = payload.context
         text, truncated = sanitise_untrusted(context.text, MAX_UNTRUSTED_CHARS)
         if not text.strip():
@@ -182,11 +249,21 @@ def create_app() -> FastAPI:
         context.text = text
         context.text_truncated = truncated
         context.word_count = len(text.split())
-        client_id = _client_id(client)
-        context_store.put(client_id, context)
+        context_store.put(user.tenant_id, target_user, context)
+        try:
+            db.log_mas_event(
+                user.tenant_id,
+                target_user,
+                request_id_ctx.get(),
+                "context_ingest",
+                "web_reader",
+                {"url": context.url, "words": context.word_count},
+            )
+        except Exception:
+            pass
         return ContextIngestResponse(
             stored=True,
-            client_id=client_id,
+            client_id=target_user,
             word_count=context.word_count,
             truncated=truncated,
             stored_at=context.captured_at,
@@ -194,29 +271,38 @@ def create_app() -> FastAPI:
 
     @application.get("/v1/context/latest", response_model=ContextLatestResponse)
     def latest_context(
+        request: Request,
         client: Annotated[str | None, Header(alias=CLIENT_ID_HEADER)] = None,
     ) -> ContextLatestResponse:
-        context, age = context_store.get(_client_id(client))
+        user = _check_auth(request)
+        target_user = _client_id(client) if (user.is_service and client) else user.user_id
+        context, age = context_store.get(user.tenant_id, target_user)
         return ContextLatestResponse(context=context, age_seconds=age)
 
     @application.delete("/v1/context")
     def clear_context(
+        request: Request,
         client: Annotated[str | None, Header(alias=CLIENT_ID_HEADER)] = None,
     ) -> dict[str, bool]:
-        context_store.clear_client(_client_id(client))
+        user = _check_auth(request)
+        target_user = _client_id(client) if (user.is_service and client) else user.user_id
+        context_store.clear_client(user.tenant_id, target_user)
         return {"cleared": True}
 
     @application.post("/v1/assist", response_model=AssistResponse)
     def assist(
+        request: Request,
         payload: AssistRequest,
         client: Annotated[str | None, Header(alias=CLIENT_ID_HEADER)] = None,
     ) -> AssistResponse:
+        user = _check_auth(request)
+        target_user = _client_id(client) if (user.is_service and client) else user.user_id
+        _check_rate_limit(request, target_user)
         started = time.monotonic()
-        client_id = _client_id(client)
 
         context = payload.context
         if context is None:
-            context, _ = context_store.get(client_id)
+            context, _ = context_store.get(user.tenant_id, target_user)
         if context is None:
             raise HTTPException(
                 status_code=409,
@@ -305,9 +391,13 @@ def create_app() -> FastAPI:
 
     @application.post("/v1/screenshot", response_model=ScreenshotResponse)
     async def analyze_screenshot(
+        request: Request,
         payload: ScreenshotRequest,
         client_id: Annotated[str, Header(alias="X-MindSpace-Client")] = "local",
     ) -> ScreenshotResponse:
+        _check_auth(request)
+        cid = _client_id(client_id)
+        _check_rate_limit(request, cid)
         started = time.monotonic()
         text_context = payload.textContext.text if payload.textContext else ""
         understanding = vision_agent.analyze(
@@ -349,90 +439,65 @@ def create_app() -> FastAPI:
 
     @application.get("/v1/mas/activity")
     def get_mas_activity(
+        request: Request,
         limit: int = 50,
         run_id: str | None = None,
     ) -> dict[str, Any]:
-        """Expose real Blackboard audit logs and P2P mailbox events from the multi-agent backend."""
-        import json
-        import sqlite3
-        from pathlib import Path
+        """Expose tenant-isolated audit logs and activity events."""
+        user = _check_auth(request)
+        if run_id and not re.match(r"^[a-zA-Z0-9_\-\.]{1,128}$", run_id):
+            raise HTTPException(status_code=422, detail="Invalid run_id format.")
 
-        base_dir = Path(__file__).resolve().parent.parent / "mas" / "outputs"
-        bb_path = base_dir / "blackboard.db"
-        p2p_path = base_dir / "p2p_mailbox.db"
+        db_events = db.get_mas_activity(user.tenant_id, user.user_id, run_id=run_id, limit=limit)
+        audit_events = list(db_events)
 
-        audit_events: list[dict[str, Any]] = []
-        if bb_path.exists():
-            try:
-                with sqlite3.connect(str(bb_path), timeout=3.0) as conn:
-                    conn.row_factory = sqlite3.Row
-                    query = "SELECT id, run_id, event_type, agent_name, details, created_at FROM audit_log"
-                    params: list[Any] = []
-                    if run_id:
-                        query += " WHERE run_id = ?"
-                        params.append(run_id)
-                    query += " ORDER BY id DESC LIMIT ?"
-                    params.append(limit)
-                    rows = conn.execute(query, params).fetchall()
-                    for r in rows:
-                        det = r["details"]
-                        try:
-                            det = json.loads(det) if det else {}
-                        except Exception:
-                            pass
-                        audit_events.append({
-                            "id": r["id"],
-                            "run_id": r["run_id"],
-                            "event_type": r["event_type"],
-                            "agent_name": r["agent_name"],
-                            "details": det,
-                            "created_at": r["created_at"],
-                        })
-            except Exception as e:
-                logger.warning("Failed to query blackboard.db: %s", e)
+        # Backwards compatibility fallback for service/local dev if no entries in tenant DB yet
+        if not audit_events and (user.is_service or user.role == "developer"):
+            import json
+            import sqlite3
+            from pathlib import Path
 
-        p2p_messages: list[dict[str, Any]] = []
-        if p2p_path.exists():
-            try:
-                with sqlite3.connect(str(p2p_path), timeout=3.0) as conn:
-                    conn.row_factory = sqlite3.Row
-                    query = "SELECT seq, msg_id, correlation_id, sender, recipient, msg_type, content, created_at, delivered_at, acknowledged FROM p2p_messages"
-                    params = []
-                    if run_id:
-                        query += " WHERE correlation_id = ?"
-                        params.append(run_id)
-                    query += " ORDER BY seq DESC LIMIT ?"
-                    params.append(limit)
-                    rows = conn.execute(query, params).fetchall()
-                    for r in rows:
-                        cnt = r["content"]
-                        try:
-                            cnt = json.loads(cnt) if cnt else {}
-                        except Exception:
-                            pass
-                        p2p_messages.append({
-                            "seq": r["seq"],
-                            "msg_id": r["msg_id"],
-                            "correlation_id": r["correlation_id"],
-                            "sender": r["sender"],
-                            "recipient": r["recipient"],
-                            "msg_type": r["msg_type"],
-                            "content": cnt,
-                            "created_at": r["created_at"],
-                            "delivered_at": r["delivered_at"],
-                            "acknowledged": bool(r["acknowledged"]),
-                        })
-            except Exception as e:
-                logger.warning("Failed to query p2p_mailbox.db: %s", e)
+            base_dir = Path(__file__).resolve().parent.parent / "mas" / "outputs"
+            bb_path = base_dir / "blackboard.db"
+            if bb_path.exists():
+                try:
+                    with sqlite3.connect(str(bb_path), timeout=3.0) as conn:
+                        conn.row_factory = sqlite3.Row
+                        query = "SELECT id, run_id, event_type, agent_name, details, created_at FROM audit_log"
+                        params: list[Any] = []
+                        if run_id:
+                            query += " WHERE run_id = ?"
+                            params.append(run_id)
+                        query += " ORDER BY id DESC LIMIT ?"
+                        params.append(limit)
+                        rows = conn.execute(query, params).fetchall()
+                        for r in rows:
+                            det = r["details"]
+                            try:
+                                det = json.loads(det) if det else {}
+                            except Exception:
+                                pass
+                            audit_events.append({
+                                "id": r["id"],
+                                "run_id": r["run_id"],
+                                "event_type": r["event_type"],
+                                "agent_name": r["agent_name"],
+                                "details": det,
+                                "created_at": r["created_at"],
+                            })
+                except Exception as e:
+                    logger.warning("Failed to query blackboard.db: %s", e)
 
         return {
             "status": "ok",
+            "tenant_id": user.tenant_id,
+            "user_id": user.user_id,
             "stats": {
                 "audit_events_count": len(audit_events),
-                "p2p_messages_count": len(p2p_messages),
+                "p2p_messages_count": 0,
             },
             "blackboard_events": audit_events,
-            "p2p_messages": p2p_messages,
+            "p2p_messages": [],
         }
 
     return application

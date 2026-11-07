@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
 /**
  * Client shim for @tanstack/react-start for self-contained extension builds.
  * Implements createServerFn, useServerFn, and createMiddleware so components
@@ -5,12 +6,14 @@
  */
 
 export function createServerFn(options?: Record<string, unknown>) {
-  let registeredHandler: ((ctx: { data: unknown; context: Record<string, unknown> }) => Promise<unknown>) | null = null;
+  let registeredHandler:
+    ((ctx: { data: unknown; context: Record<string, unknown> }) => Promise<unknown>) | null = null;
 
   const fn: any = async (payload?: any) => {
     if (registeredHandler) {
       try {
-        const inputData = payload && typeof payload === "object" && "data" in payload ? payload.data : payload;
+        const inputData =
+          payload && typeof payload === "object" && "data" in payload ? payload.data : payload;
         return await registeredHandler({ data: inputData, context: { userId: "local-user" } });
       } catch (err) {
         console.warn("[Extension client] serverFn execution failed:", err);
@@ -55,4 +58,3 @@ export function createStart() {
 export function createCsrfMiddleware() {
   return () => ({});
 }
-

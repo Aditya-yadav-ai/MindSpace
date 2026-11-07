@@ -30,6 +30,7 @@ from typing import Any, Callable
 from urllib.parse import parse_qs, urlparse
 
 import httpx
+import httpcore
 from mcp.server.mcpserver import MCPServer
 
 # duckduckgo_search 8.x prints a rename notice on every instantiation; it is a
@@ -117,6 +118,50 @@ server: MCPServer = MCPServer(
 )
 
 
+class SSRFProtectedBackend(httpcore.SyncBackend):
+    """Network backend that eliminates TOCTOU DNS rebinding by inspecting resolved IPs before connection."""
+
+    def connect_tcp(self, host: str, port: int, timeout: float | None = None, local_address: str | None = None, socket_options: Any = None):
+        try:
+            infos = socket.getaddrinfo(host, port, proto=socket.IPPROTO_TCP)
+        except OSError as err:
+            raise PermissionError(f"SSRF blocked: Hostname could not be resolved: {err}") from err
+        safe_addr = None
+        for family, type_, proto, _canonname, sockaddr in infos:
+            ip = sockaddr[0]
+            try:
+                parsed = ipaddress.ip_address(ip)
+                if not (
+                    parsed.is_private
+                    or parsed.is_loopback
+                    or parsed.is_link_local
+                    or parsed.is_reserved
+                    or parsed.is_multicast
+                    or parsed.is_unspecified
+                ):
+                    safe_addr = (family, type_, proto, sockaddr)
+                    break
+            except ValueError:
+                continue
+        if not safe_addr:
+            raise PermissionError(f"SSRF blocked: Host {host} does not resolve to a safe public internet address.")
+
+        family, type_, proto, sockaddr = safe_addr
+        sock = socket.socket(family=family, type=type_, proto=proto)
+        if timeout is not None:
+            sock.settimeout(timeout)
+        sock.connect(sockaddr)
+        return httpcore._backends.sync.SyncStream(sock)
+
+
+class SafeSSRFTransport(httpx.HTTPTransport):
+    """Custom HTTP transport guaranteeing all TCP connections hit pre-validated non-private IPs."""
+
+    def __init__(self, **kwargs: Any) -> None:
+        super().__init__(**kwargs)
+        self._pool = httpcore.ConnectionPool(network_backend=SSRFProtectedBackend(), retries=0)
+
+
 def _is_public_host(hostname: str) -> tuple[bool, str]:
     if not hostname:
         return False, "URL has no hostname."
@@ -132,7 +177,14 @@ def _is_public_host(hostname: str) -> tuple[bool, str]:
             parsed = ipaddress.ip_address(address)
         except ValueError:
             return False, f"Unparseable resolved address: {address}"
-        if parsed.is_private or parsed.is_loopback or parsed.is_link_local or parsed.is_reserved:
+        if (
+            parsed.is_private
+            or parsed.is_loopback
+            or parsed.is_link_local
+            or parsed.is_reserved
+            or parsed.is_multicast
+            or parsed.is_unspecified
+        ):
             return False, f"Address {address} is not a public internet address."
     return True, ""
 
@@ -552,7 +604,12 @@ def fetch_page(url: str, max_chars: int = 12_000) -> dict[str, Any]:
 
     limit = max(500, min(int(max_chars), MAX_FETCH_CHARS))
     try:
-        with httpx.Client(timeout=20, follow_redirects=False, headers={"User-Agent": USER_AGENT}) as client:
+        with httpx.Client(
+            transport=SafeSSRFTransport(),
+            timeout=20,
+            follow_redirects=False,
+            headers={"User-Agent": USER_AGENT},
+        ) as client:
             with client.stream("GET", url) as response:
                 if response.status_code in {301, 302, 303, 307, 308}:
                     return {
@@ -572,7 +629,7 @@ def fetch_page(url: str, max_chars: int = 12_000) -> dict[str, Any]:
                     total += len(chunk)
                     if total >= MAX_RESPONSE_BYTES:
                         break
-    except httpx.HTTPError as error:
+    except (httpx.HTTPError, PermissionError) as error:
         return {"url": url, "error": f"Fetch failed: {type(error).__name__}: {error}"[:300]}
 
     body = b"".join(chunks)[:MAX_RESPONSE_BYTES].decode("utf-8", errors="replace")
