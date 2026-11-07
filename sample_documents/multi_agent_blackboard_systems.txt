@@ -1,0 +1,25 @@
+Title: Collaborative Multi-Agent Systems: Architectural Patterns for Browser Automation
+Topic: Blackboard Architecture and Peer-to-Peer Mailbox Coordination
+Reference: MindSpace Technical Paper Series, Stage 8 Architecture
+
+1. Abstract:
+Modern intelligent browser assistants require coordinated execution among heterogeneous artificial intelligence agents. This paper examines the interplay between the Blackboard pattern and direct Peer-to-Peer (P2P) messaging within the MindSpace system. We demonstrate that shared state decoupling combined with addressed mailbox delivery yields fault-tolerant execution under variable network conditions.
+
+2. Blackboard Pattern in Agent Systems:
+The Blackboard architecture consists of three core components:
+1. Blackboard State: A centralized, append-only SQLite or PostgreSQL data structure holding hypotheses, plans, and intermediate artifacts.
+2. Knowledge Sources (Specialist Agents): Independent software agents specialized in discrete tasks (Vision understanding, lexical RAG, and MCP web search).
+3. Control Component (Manager Agent): Oversees state evolution and decides agent dispatch order without tight coupling.
+
+3. Asynchronous P2P Messaging:
+While the Blackboard maintains passive shared memory, active agent collaboration requires point-to-point addressed messaging. MindSpace implements a thread-safe, SQLite/PostgreSQL-backed P2P Mailbox providing:
+- Explicit message identifiers (`msg_id`) and correlation identifiers (`correlation_id`).
+- Time-to-Live (TTL) expiration preventing stale message consumption.
+- Dead-letter queues for unhandled requests.
+- Single-consumer acknowledgment semantics.
+
+4. Failure Recovery & Graceful Degradation:
+When external LLM inference providers experience rate limits or network partitions, the Supervisor Agent activates local heuristic mode:
+- Untrusted web content is sanitized using strict character encoding.
+- Lexical document retrieval uses deterministic hashed bag-of-words vectors (`hash-bow-v1`).
+- Responses are transparently labelled with `[SIMULATED]` provenance headers to preserve research integrity.

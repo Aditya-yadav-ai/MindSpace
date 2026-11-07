@@ -13,7 +13,13 @@
     "build:extension": "node scripts/build-extension.mjs",
     "build:all": "vite build && node scripts/build-extension.mjs",
     "test:google": "jiti src/lib/google/__tests__/adapters.test.mjs",
-    "test:extension": "node --test tests/extension_browser_test.mjs"
+    "test:extension": "node --test tests/extension_browser_test.mjs",
+    "demo": "python apps/api/scripts/demo_walkthrough.py",
+    "db:status": "python apps/api/scripts/db_admin.py status",
+    "db:migrate": "python apps/api/scripts/db_admin.py migrate",
+    "db:seed": "python apps/api/scripts/db_admin.py seed",
+    "db:reset": "python apps/api/scripts/db_admin.py reset",
+    "db:backup": "python apps/api/scripts/db_admin.py backup"
   },
   "overrides": {
     "rolldown": "1.2.1",

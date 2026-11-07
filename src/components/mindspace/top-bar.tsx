@@ -52,6 +52,14 @@ export function TopBar({
         </div>
       </div>
 
+      <span
+        title="MindSpace is operating in self-contained offline demonstration mode (Local Intelligence)"
+        className="hidden lg:inline-flex items-center gap-1.5 rounded-full border border-primary/20 bg-primary/5 px-2.5 py-0.5 text-[11px] font-medium text-foreground/80 shadow-xs"
+      >
+        <span className="size-1.5 rounded-full bg-primary" aria-hidden="true" />
+        Local / Zero-Cloud
+      </span>
+
       <StatusPill
         tone={hasContext ? "positive" : "neutral"}
         className="hidden shrink-0 sm:inline-flex"

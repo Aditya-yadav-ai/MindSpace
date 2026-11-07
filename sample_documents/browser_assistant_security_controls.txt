@@ -1,0 +1,24 @@
+Title: Defense-in-Depth Security Engineering for Chromium Manifest V3 AI Assistants
+Author: MindSpace Security Working Group
+Classification: Technical Whitepaper
+
+1. Executive Summary:
+Browser extensions operate within a uniquely privileged security boundary. With direct access to active tab DOM structures, user selections, and web session tokens, an AI browser assistant must enforce defense-in-depth controls across client and server boundaries. This paper details the zero-trust security controls implemented in MindSpace Stage 8.
+
+2. Manifest V3 Isolation & Least Privilege:
+The Chromium Manifest V3 specification restricts background service workers from executing arbitrary remote scripts. MindSpace enforces:
+- Scoped permissions: `sidePanel`, `storage`, `activeTab`, `scripting`, `tabs`, `notifications`.
+- Proactive scheme restriction: content scripts are blocked on `chrome://`, `edge://`, `about:`, `devtools:`, and Chrome Web Store pages before injection attempts occur.
+- Transient capture lifecycle: active tab context and screenshots reside in local memory / ephemeral extension storage and are never uploaded to third-party ad networks.
+
+3. Physical Socket SSRF Defense:
+The Model Context Protocol (MCP) Research Agent performs real-time web lookups. To prevent Server-Side Request Forgery (SSRF) and DNS rebinding attacks:
+- The HTTP transport intercepts the raw physical socket connection (`connect_tcp`) before the TCP handshake.
+- Hostnames are resolved to IP addresses and evaluated against CIDR filters.
+- All connections to loopback (`127.0.0.0/8`), private RFC1918 (`10.0.0.0/8`, `172.16.0.0/12`, `192.168.0.0/16`), link-local (`169.254.0.0/16`), and AWS/GCP cloud metadata services (`169.254.169.254`) are immediately aborted with `PermissionError`.
+
+4. Cryptographic Authentication & Multi-Tenancy:
+- Private API routes validate JSON Web Tokens (PyJWT) enforcing cryptographic signature (`HS256`, `RS256`), expiration with 30s clock-skew leeway, issuer, and audience.
+- Composite compound keys `(tenant_id, user_id)` ensure strict database isolation.
+- OAuth refresh tokens are encrypted at rest using AES-256-GCM with authenticated verification tags.
+- Ingestion endpoints enforce a 25 MB payload threshold, sliding-window rate limiters, and complete GDPR data purging.

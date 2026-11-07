@@ -39,6 +39,12 @@ def main() -> None:
     restore_parser = subparsers.add_parser("restore", help="Restore database from a backup file")
     restore_parser.add_argument("--file", required=True, help="Path to backup file")
 
+    # Seed Demo Data
+    subparsers.add_parser("seed", help="Seed realistic demonstration data into demo-tenant")
+
+    # Reset Demo Data
+    subparsers.add_parser("reset", help="Purge and reseed demo tenant data")
+
     args = parser.parse_args()
 
     if args.command == "status":
@@ -64,6 +70,17 @@ def main() -> None:
         db.restore_database(args.file)
         print("Database successfully restored.")
 
+    elif args.command == "seed":
+        print("Seeding demo data into demo-tenant...")
+        res = db.seed_demo_data()
+        print(f"Demo data seeded successfully: run_id={res.get('run_id')} url={res.get('context_url')}")
+
+    elif args.command == "reset":
+        print("Resetting demo data...")
+        res = db.reset_demo_data()
+        print(f"Demo data reset and reseeded: run_id={res.get('run_id')}")
+
 
 if __name__ == "__main__":
     main()
+

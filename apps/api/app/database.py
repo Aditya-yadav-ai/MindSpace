@@ -460,6 +460,103 @@ class DatabaseManager:
         logger.info("Purged user data for tenant=%s user=%s: %s", tenant_id, user_id, purged)
         return purged
 
+    # ── DEMONSTRATION & SAMPLE DATA SEEDING ──────────────────────────────────
+
+    def seed_demo_data(self, tenant_id: str = "demo-tenant", user_id: str = "demo-user") -> dict[str, Any]:
+        """Seed high-quality, realistic demonstration data strictly isolated to demo tenant/user."""
+        demo_text = (
+            "Attention Is All You Need (Vaswani et al., 2017) introduced the Transformer, a novel "
+            "neural network architecture based entirely on attention mechanisms, dispensing with recurrence "
+            "and convolutions entirely. The Transformer allows for significantly more parallelization and can "
+            "reach a new state of the art in translation quality after being trained for as little as twelve hours "
+            "on eight P100 GPUs. Key components include Multi-Head Scaled Dot-Product Attention, Positional "
+            "Encoding, and sinusoidal embeddings to encode sequence order without sequential computation overhead."
+        )
+        context = PageContext(
+            url="https://arxiv.org/abs/1706.03762",
+            title="Attention Is All You Need — Transformer Architecture",
+            domain="arxiv.org",
+            text=demo_text,
+            source="manual",
+        )
+        self.save_context(tenant_id, user_id, context)
+
+        # Seed realistic agent events
+        run_id = "demo-run-stage8"
+        self.log_mas_event(
+            tenant_id,
+            user_id,
+            run_id,
+            "goal_planned",
+            "manager_agent",
+            {
+                "goal": "Explain the Transformer multi-head attention mechanism and extract key equations",
+                "selected_agents": ["vision_agent", "research_agent", "rag_agent", "report_agent"],
+                "offline_mode": True,
+            },
+        )
+        self.log_mas_event(
+            tenant_id,
+            user_id,
+            run_id,
+            "mcp_tool_execution",
+            "research_agent",
+            {
+                "tool": "extract_facts",
+                "facts_found": 3,
+                "citations": ["Vaswani et al. (2017)", "Section 3.2 Multi-Head Attention"],
+            },
+        )
+        self.log_mas_event(
+            tenant_id,
+            user_id,
+            run_id,
+            "synthesis_complete",
+            "report_agent",
+            {
+                "summary": "Multi-Head Attention projects queries, keys, and values h times with learned linear projections.",
+                "verified": True,
+                "confidence_score": 0.98,
+            },
+        )
+
+        # Seed sample P2P message
+        with self.connection() as conn:
+            param_ph = "%s" if self.is_postgres else "?"
+            conn.execute(
+                f"""
+                INSERT INTO p2p_messages_store (
+                    tenant_id, user_id, msg_id, correlation_id, sender, recipient, msg_type, content, acknowledged
+                ) VALUES ({param_ph}, {param_ph}, {param_ph}, {param_ph}, {param_ph}, {param_ph}, {param_ph}, {param_ph}, {param_ph})
+                ON CONFLICT (msg_id) DO NOTHING;
+                """,
+                (
+                    tenant_id,
+                    user_id,
+                    "msg-demo-001",
+                    "corr-demo-001",
+                    "manager_agent",
+                    "research_agent",
+                    "task_dispatch",
+                    json.dumps({"subtask": "Extract computational complexity per layer"}),
+                    1,
+                ),
+            )
+
+        logger.info("Seeded demo data for tenant=%s, user=%s", tenant_id, user_id)
+        return {
+            "seeded": True,
+            "tenant_id": tenant_id,
+            "user_id": user_id,
+            "context_url": context.url,
+            "run_id": run_id,
+        }
+
+    def reset_demo_data(self, tenant_id: str = "demo-tenant", user_id: str = "demo-user") -> dict[str, Any]:
+        """Purge and cleanly reseed demonstration data."""
+        self.purge_user_data(tenant_id, user_id)
+        return self.seed_demo_data(tenant_id, user_id)
+
     # ── MIGRATIONS & VERSIONING ──────────────────────────────────────────────
 
     def get_applied_migrations(self) -> list[dict[str, Any]]:

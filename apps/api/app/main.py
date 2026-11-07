@@ -54,6 +54,8 @@ from app.schemas import (
     ScreenshotAnalysis,
     ScreenshotRequest,
     ScreenshotResponse,
+    ResearchRequest,
+    ResearchResponse,
     SourceRef,
 )
 from app.security.jwt_auth import AuthUser, authenticate_request
@@ -565,6 +567,61 @@ def create_app() -> FastAPI:
             "blackboard_events": audit_events,
             "p2p_messages": [],
         }
+
+    @application.post("/v1/research", response_model=ResearchResponse)
+    def run_research(
+        request: Request,
+        payload: ResearchRequest,
+        client: Annotated[str | None, Header(alias=CLIENT_ID_HEADER)] = None,
+    ) -> ResearchResponse:
+        """Trigger multi-agent research workflow (Manager -> Research -> RAG -> Report)."""
+        user = _check_auth(request)
+        target_user = _client_id(client) if (user.is_service and client) else user.user_id
+        _check_rate_limit(request, target_user)
+        from mas.demo_workflow import run_multi_agent_demo
+
+        result = run_multi_agent_demo(
+            payload.query,
+            tenant_id=user.tenant_id,
+            user_id=target_user,
+        )
+        sources = [
+            SourceRef(
+                index=s["index"],
+                title=s["title"],
+                url=s["url"],
+                snippet=s["snippet"],
+                similarity=s.get("similarity"),
+            )
+            for s in result.get("sources", [])
+        ]
+        return ResearchResponse(
+            request_id=request_id_ctx.get(),
+            query=payload.query,
+            persona=payload.persona,
+            architecture=payload.architecture,
+            status="success" if result["status"] == "success" else "partial",
+            summary=result["summary"],
+            sources=sources,
+            mode=result["mode"],
+            mock=result["mock"],
+            latency_ms=result["total_latency_ms"],
+        )
+
+    @application.post("/v1/mas/demo")
+    def run_mas_demo_endpoint(
+        request: Request,
+        payload: dict[str, Any] | None = None,
+        client: Annotated[str | None, Header(alias=CLIENT_ID_HEADER)] = None,
+    ) -> dict[str, Any]:
+        """Execute the 8-step multi-agent demonstration and return full execution trace."""
+        user = _check_auth(request)
+        target_user = _client_id(client) if (user.is_service and client) else user.user_id
+        _check_rate_limit(request, target_user)
+        from mas.demo_workflow import run_multi_agent_demo
+
+        q = (payload and payload.get("query")) or "Synthesize multi-agent architecture and Transformer attention mechanisms"
+        return run_multi_agent_demo(q, tenant_id=user.tenant_id, user_id=target_user)
 
     return application
 

@@ -192,9 +192,16 @@ export function SidebarNav({
                 <span className="block truncate text-[12px] font-semibold text-sidebar-foreground">
                   {user.name}
                 </span>
-                <span className="block truncate text-[10px] text-muted-foreground">
-                  {user.preview ? "Preview mode" : user.email}
-                </span>
+                {user.preview ? (
+                  <span className="flex items-center gap-1.5 truncate text-[10px] text-amber-600 dark:text-amber-400 font-medium">
+                    <span className="size-1.5 rounded-full bg-amber-500" />
+                    Demo / Offline Mode
+                  </span>
+                ) : (
+                  <span className="block truncate text-[10px] text-muted-foreground">
+                    {user.email}
+                  </span>
+                )}
               </span>
               <Settings2 className="size-3.5 shrink-0 text-muted-foreground group-hover:text-sidebar-foreground transition-colors" />
             </>

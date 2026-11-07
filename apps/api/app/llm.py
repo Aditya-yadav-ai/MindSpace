@@ -355,3 +355,20 @@ def generate_vision_understanding(
         completion_tokens=int(getattr(usage, "completion_tokens", 0) or 0),
         latency_ms=latency_ms,
     )
+
+
+def get_provider_status(config: Settings | None = None) -> dict[str, Any]:
+    """Expose transparent provider availability and active model configuration."""
+    active = config if config is not None else default_settings
+    state = resolve_runtime(active)
+    return {
+        "provider": "groq",
+        "mode": state.mode,
+        "mock": state.mode != MODE_LIVE,
+        "configured_model": active.model,
+        "vision_model": active.vision_model,
+        "has_usable_api_key": bool(active.groq_api_key and len(active.groq_api_key.strip()) > 10),
+        "timeout_seconds": active.llm_timeout_seconds,
+        "fallback_engine": "offline-heuristic-rag",
+        "fallback_ready": True,
+    }

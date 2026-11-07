@@ -92,3 +92,4 @@ jobs:
       - name: Check for unredacted secrets & conflict markers
         run: |
           ! grep -rnw . -e '<<<<<<<' -e '>>>>>>>' --exclude-dir={.git,node_modules,.venv}
+
