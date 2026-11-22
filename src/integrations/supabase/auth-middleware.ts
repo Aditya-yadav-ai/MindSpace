@@ -109,7 +109,7 @@ export const requireSupabaseAuth = createMiddleware({ type: "function" }).server
 
     // 4. No token provided: fail closed in production
     const isProd =
-      process.env["ENVIRONMENT"] === "production" || process.env.NODE_ENV === "production";
+      process.env["ENVIRONMENT"] === "production" || process.env["NODE_ENV"] === "production";
     if (isProd) {
       throw new Error(
         "Unauthorized: Authentication required. Please sign in to MindSpace to continue.",

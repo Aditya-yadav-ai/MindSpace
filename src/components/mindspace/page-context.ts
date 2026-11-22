@@ -95,32 +95,35 @@ export function usePageContext() {
     }
 
     if (typeof chrome !== "undefined" && chrome?.storage?.local) {
-      chrome.storage.local.get(["lastCapture", "lastScreenshotCapture"], (items) => {
-        if (chrome.runtime?.lastError) return;
-        if (items?.lastCapture) {
-          const cap = items.lastCapture as Partial<PageContext>;
-          setContext((current) => ({
-            ...current,
-            title: cap.title || current.title,
-            url: cap.url || current.url,
-            text: cap.text || current.text,
-            selection: cap.selection || current.selection,
-          }));
-        } else if (items?.lastScreenshotCapture) {
-          const sc = items.lastScreenshotCapture as {
-            title?: string;
-            url?: string;
-            textContext?: Partial<PageContext>;
-          };
-          setContext((current) => ({
-            ...current,
-            title: sc.title || current.title,
-            url: sc.url || current.url,
-            text: sc.textContext?.text || current.text,
-            selection: sc.textContext?.selection || current.selection,
-          }));
-        }
-      });
+      chrome.storage.local.get(
+        ["lastCapture", "lastScreenshotCapture"],
+        (items: Record<string, unknown>) => {
+          if (chrome.runtime?.lastError) return;
+          if (items["lastCapture"]) {
+            const cap = items["lastCapture"] as Partial<PageContext>;
+            setContext((current) => ({
+              ...current,
+              title: cap.title || current.title,
+              url: cap.url || current.url,
+              text: cap.text || current.text,
+              selection: cap.selection || current.selection,
+            }));
+          } else if (items["lastScreenshotCapture"]) {
+            const sc = items["lastScreenshotCapture"] as {
+              title?: string;
+              url?: string;
+              textContext?: Partial<PageContext>;
+            };
+            setContext((current) => ({
+              ...current,
+              title: sc.title || current.title,
+              url: sc.url || current.url,
+              text: sc.textContext?.text || current.text,
+              selection: sc.textContext?.selection || current.selection,
+            }));
+          }
+        },
+      );
 
       const messageListener = (message: {
         type?: string;
@@ -146,6 +149,7 @@ export function usePageContext() {
     }
 
     setHydrated(true);
+    return undefined;
   }, []);
 
   useEffect(() => {
@@ -192,10 +196,11 @@ export function usePageContext() {
 
     let cancelled = false;
     async function captureActiveTab() {
+      if (!chromeApi?.tabs || !chromeApi.scripting) return;
       try {
-        const [tab] = await chromeApi.tabs!.query({ active: true, lastFocusedWindow: true });
+        const [tab] = await chromeApi.tabs.query({ active: true, lastFocusedWindow: true });
         if (tab?.id == null) return;
-        const [injected] = await chromeApi.scripting!.executeScript({
+        const [injected] = await chromeApi.scripting.executeScript({
           target: { tabId: tab.id },
           func: () => ({
             title: document.title,

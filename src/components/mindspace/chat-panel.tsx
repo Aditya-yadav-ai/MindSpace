@@ -53,8 +53,8 @@ export function ChatPanel({
   onBusyChange,
 }: {
   context: PageContext;
-  command?: RefObject<ChatCommand | null>;
-  onBusyChange?: (busy: boolean) => void;
+  command?: RefObject<ChatCommand | null> | undefined;
+  onBusyChange?: ((busy: boolean) => void) | undefined;
 }) {
   const [initial, setInitial] = useState<UIMessage[] | null>(null);
   const contextRef = useRef(context);

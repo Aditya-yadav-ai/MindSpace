@@ -16,8 +16,8 @@ import type { TaskRecord } from "./tasks.functions";
 let _db: DatabaseSync | null = null;
 
 function getDbPath(): string {
-  if (process.env.MINDSPACE_AUTH_DB_PATH) {
-    return process.env.MINDSPACE_AUTH_DB_PATH;
+  if (process.env["MINDSPACE_AUTH_DB_PATH"]) {
+    return process.env["MINDSPACE_AUTH_DB_PATH"];
   }
   const cwd = process.cwd();
   if (fs.existsSync(path.join(cwd, "apps/api/mas/outputs"))) {
@@ -141,7 +141,7 @@ export function getLocalAutomations(userId: string): AutomationRecord[] {
     approved_tools: JSON.parse((r["approved_tools"] as string) || "[]") as string[],
     enabled: Boolean(r["enabled"]),
     last_run_at: (r["last_run_at"] as string | null) || null,
-    next_run_at: (r["next_run_at"] as string | null) || null,
+    next_run_at: (r["next_run_at"] as string | null) || new Date().toISOString(),
     created_at: String(r["created_at"]),
   }));
 }
@@ -244,7 +244,7 @@ export function getLocalAutomation(automationId: string): AutomationRecord | nul
     approved_tools: JSON.parse((row["approved_tools"] as string) || "[]") as string[],
     enabled: Boolean(row["enabled"]),
     last_run_at: (row["last_run_at"] as string | null) || null,
-    next_run_at: (row["next_run_at"] as string | null) || null,
+    next_run_at: (row["next_run_at"] as string | null) || new Date().toISOString(),
     created_at: String(row["created_at"]),
   };
 }
@@ -461,7 +461,18 @@ export function getLocalTasks(userId: string): TaskRecord[] {
     WHERE user_id = ?
     ORDER BY created_at DESC
   `);
-  return stmt.all(userId) as TaskRecord[];
+  const rows = stmt.all(userId) as Record<string, unknown>[];
+  return rows.map((r) => ({
+    id: String(r["id"]),
+    title: String(r["title"]),
+    notes: String(r["notes"] || ""),
+    due_at: (r["due_at"] as string | null) || null,
+    status: (r["status"] as "pending" | "done") || "pending",
+    source: "manual" as const,
+    source_run_id: null,
+    created_at: String(r["created_at"]),
+    updated_at: String(r["updated_at"]),
+  }));
 }
 
 export function createLocalTask(
@@ -484,15 +495,14 @@ export function createLocalTask(
     notes: data.notes || "",
     due_at: data.dueAt || null,
     status: "pending",
+    source: "manual",
+    source_run_id: null,
     created_at: now,
     updated_at: now,
   };
 }
 
-export function updateLocalTaskStatus(
-  taskId: string,
-  status: "pending" | "done" | "cancelled",
-): void {
+export function updateLocalTaskStatus(taskId: string, status: "pending" | "done"): void {
   const db = getDb();
   const now = new Date().toISOString();
   db.prepare(

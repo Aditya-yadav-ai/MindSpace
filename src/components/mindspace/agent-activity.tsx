@@ -196,7 +196,9 @@ export function AgentActivity({ signedIn, context }: { signedIn: boolean; contex
   const loadMasFeed = async (runId?: string) => {
     setMasLoading(true);
     try {
-      const feed = await getMasActivityFn({ data: { runId, limit: 50 } });
+      const feed = await getMasActivityFn({
+        data: runId ? { runId, limit: 50 } : { limit: 50 },
+      });
       if (feed) setMasFeed(feed);
     } catch (e) {
       // Extension client fallback to FastAPI backend on port 8010

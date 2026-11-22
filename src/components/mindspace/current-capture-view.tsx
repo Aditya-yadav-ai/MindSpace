@@ -48,11 +48,15 @@ export function CurrentCaptureView({
 
   React.useEffect(() => {
     if (typeof chrome !== "undefined" && chrome?.storage?.local) {
-      chrome.storage.local.get({ lastScreenshotCapture: null }, (items) => {
-        if (items?.lastScreenshotCapture?.screenshot) {
-          setScreenshotUrl(items.lastScreenshotCapture.screenshot);
-        }
-      });
+      chrome.storage.local.get(
+        { lastScreenshotCapture: null },
+        (items: Record<string, unknown>) => {
+          const sc = items["lastScreenshotCapture"] as { screenshot?: string } | undefined;
+          if (sc?.screenshot) {
+            setScreenshotUrl(sc.screenshot);
+          }
+        },
+      );
       const onMsg = (msg: { type?: string; payload?: { data?: { screenshot?: string } } }) => {
         if (msg?.type === "MINDSPACE_SCREENSHOT_CAPTURED" && msg.payload?.data?.screenshot) {
           setScreenshotUrl(msg.payload.data.screenshot);
@@ -63,6 +67,7 @@ export function CurrentCaptureView({
         chrome.runtime?.onMessage?.removeListener(onMsg);
       };
     }
+    return undefined;
   }, []);
 
   // Derive visual layout and entities from the current page text
@@ -132,12 +137,15 @@ export function CurrentCaptureView({
   const handleCaptureNow = () => {
     setCapturing(true);
     if (typeof chrome !== "undefined" && chrome?.runtime?.sendMessage) {
-      chrome.runtime.sendMessage({ type: "MINDSPACE_CAPTURE_SCREENSHOT" }, (resp) => {
-        setCapturing(false);
-        if (resp?.data?.screenshot) {
-          setScreenshotUrl(resp.data.screenshot);
-        }
-      });
+      chrome.runtime.sendMessage(
+        { type: "MINDSPACE_CAPTURE_SCREENSHOT" },
+        (resp: { data?: { screenshot?: string } } | undefined) => {
+          setCapturing(false);
+          if (resp?.data?.screenshot) {
+            setScreenshotUrl(resp.data.screenshot);
+          }
+        },
+      );
     } else {
       setTimeout(() => {
         setCapturing(false);

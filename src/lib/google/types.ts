@@ -139,7 +139,7 @@ export type FormDetails = {
 export type FormQuestion = {
   itemId: string;
   title: string;
-  description?: string;
+  description?: string | undefined;
 };
 export type FormResponseSummaryStat = {
   formId: string;
@@ -152,7 +152,7 @@ export type MeetSpaceInfo = {
   name: string;
   meetingUri: string;
   meetingCode: string;
-  config?: Record<string, unknown>;
+  config?: Record<string, unknown> | undefined;
 };
 export type ConferenceRecord = {
   name: string;
@@ -187,17 +187,17 @@ export type StudentSubmission = {
   id: string;
   userId: string;
   state: string;
-  assignedGrade?: number;
+  assignedGrade?: number | undefined;
 };
 export type CourseMaterial = {
   id: string;
   title: string;
-  link?: string;
+  link?: string | undefined;
 };
 export type CourseWorkCreateInput = {
   title: string;
-  description?: string;
-  dueTime?: string;
+  description?: string | undefined;
+  dueTime?: string | undefined;
 };
 
 export type ChatSpaceSummary = { name: string; displayName: string; type: string };
@@ -205,20 +205,20 @@ export type ChatSpaceDetails = {
   name: string;
   displayName: string;
   spaceType: string;
-  description?: string;
+  description?: string | undefined;
 };
 export type ChatMessageInput = { space: string; text: string };
 export type ChatMessageResult = { name: string; createTime: string };
 export type ChatMessageSummary = {
   name: string;
   text: string;
-  sender?: string;
+  sender?: string | undefined;
   createTime: string;
 };
 export type ChatMemberSummary = {
   name: string;
-  displayName?: string;
-  state?: string;
+  displayName?: string | undefined;
+  state?: string | undefined;
 };
 
 /* ------------------------------------------------------------------ */
@@ -232,25 +232,25 @@ export type TaskListSummary = {
 export type TaskSummary = {
   id: string;
   title: string;
-  notes?: string;
-  due?: string | null;
+  notes?: string | undefined;
+  due?: string | null | undefined;
   status: string;
-  completed?: string | null;
-  updated?: string | null;
+  completed?: string | null | undefined;
+  updated?: string | null | undefined;
 };
 export type TaskCreateInput = {
-  taskListId?: string;
+  taskListId?: string | undefined;
   title: string;
-  notes?: string;
-  due?: string;
+  notes?: string | undefined;
+  due?: string | undefined;
 };
 export type TaskUpdateInput = {
   taskListId: string;
   taskId: string;
-  title?: string;
-  notes?: string;
-  due?: string;
-  status?: string;
+  title?: string | undefined;
+  notes?: string | undefined;
+  due?: string | undefined;
+  status?: string | undefined;
 };
 
 /* ------------------------------------------------------------------ */
@@ -259,23 +259,23 @@ export type TaskUpdateInput = {
 export type ContactSummary = {
   resourceName: string;
   displayName: string;
-  email?: string | null;
-  phone?: string | null;
-  photoUrl?: string | null;
+  email?: string | null | undefined;
+  phone?: string | null | undefined;
+  photoUrl?: string | null | undefined;
 };
 export type ContactCreateInput = {
   givenName: string;
-  familyName?: string;
-  email?: string;
-  phone?: string;
+  familyName?: string | undefined;
+  email?: string | undefined;
+  phone?: string | undefined;
 };
 export type ContactUpdateInput = {
   resourceName: string;
   etag: string;
-  givenName?: string;
-  familyName?: string;
-  email?: string;
-  phone?: string;
+  givenName?: string | undefined;
+  familyName?: string | undefined;
+  email?: string | undefined;
+  phone?: string | undefined;
 };
 
 /* ------------------------------------------------------------------ */
@@ -286,15 +286,15 @@ export type PlaceSummary = {
   name: string;
   formattedAddress: string;
   location: { lat: number; lng: number };
-  rating?: number;
+  rating?: number | undefined;
 };
 export type PlaceDetails = {
   placeId: string;
   name: string;
   formattedAddress: string;
-  phone?: string;
-  website?: string;
-  rating?: number;
+  phone?: string | undefined;
+  website?: string | undefined;
+  rating?: number | undefined;
   location: { lat: number; lng: number };
 };
 export type GeocodeResult = {
@@ -334,16 +334,16 @@ export type YouTubeVideoDetails = {
   description: string;
   channelId: string;
   channelTitle: string;
-  viewCount?: string;
-  likeCount?: string;
-  duration?: string;
+  viewCount?: string | undefined;
+  likeCount?: string | undefined;
+  duration?: string | undefined;
 };
 export type YouTubeChannelSummary = {
   id: string;
   title: string;
   description: string;
-  subscriberCount?: string;
-  videoCount?: string;
+  subscriberCount?: string | undefined;
+  videoCount?: string | undefined;
 };
 export type YouTubePlaylistSummary = {
   id: string;
@@ -369,5 +369,5 @@ export type ServiceCapability = {
   writes: boolean;
   scopes: readonly string[];
   operations: readonly string[];
-  requiresApiKey?: boolean;
+  requiresApiKey?: boolean | undefined;
 };

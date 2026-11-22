@@ -90,7 +90,6 @@ async function readPdf(file: File): Promise<string> {
     cMapUrl: cMapUrl,
     cMapPacked: true,
     useWorkerFetch: false,
-    isEvalSupported: false,
     useSystemFonts: true,
   });
 
@@ -269,6 +268,7 @@ export function KnowledgeBase({ signedIn }: { signedIn: boolean }) {
     let processedCount = 0;
     for (let i = 0; i < files.length; i++) {
       const file = files[i];
+      if (!file) continue;
       if (file.size > 25 * 1024 * 1024) {
         setError(`File "${file.name}" exceeds the maximum allowed size of 25MB.`);
         continue;

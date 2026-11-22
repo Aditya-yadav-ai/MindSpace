@@ -115,6 +115,8 @@ export function PageContextCard({
             clear={page.clear}
             captureSelection={page.captureSelection}
             wordCount={wordCount}
+            screenshot={page.screenshot}
+            captureStatus={page.captureStatus}
           />
           <div className="mt-3 flex justify-end">
             <Button variant="ghost" size="sm" onClick={() => onEditingChange(false)}>

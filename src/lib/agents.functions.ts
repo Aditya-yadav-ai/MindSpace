@@ -107,12 +107,15 @@ export const runAgentWorkflow = createServerFn({ method: "POST" })
     return result;
   });
 
+export type SerializableJson =
+  string | number | boolean | null | { [key: string]: SerializableJson } | SerializableJson[];
+
 export type MasBlackboardEvent = {
   id: number;
   run_id: string;
   event_type: string;
   agent_name: string;
-  details: Record<string, unknown>;
+  details: Record<string, SerializableJson>;
   created_at: string;
 };
 
@@ -123,7 +126,7 @@ export type MasP2PMessage = {
   sender: string;
   recipient: string;
   msg_type: string;
-  content: Record<string, unknown>;
+  content: Record<string, SerializableJson>;
   created_at: string;
   delivered_at: string | null;
   acknowledged: boolean;
@@ -140,14 +143,10 @@ export type MasActivityResponse = {
 };
 
 export const getMasActivityFeed = createServerFn({ method: "GET" })
-  .inputValidator((input: unknown) =>
-    z
-      .object({
-        runId: z.string().optional(),
-        limit: z.number().int().min(1).max(200).default(50),
-      })
-      .parse(input ?? {}),
-  )
+  .validator((input?: { runId?: string | undefined; limit?: number | undefined }) => ({
+    runId: input?.runId,
+    limit: input?.limit ?? 50,
+  }))
   .handler(async ({ data }): Promise<MasActivityResponse | null> => {
     const apiBase = (
       process.env["MINDSPACE_API_URL"] ||

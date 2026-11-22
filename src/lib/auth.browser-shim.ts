@@ -62,7 +62,7 @@ function base64UrlEncode(str: string): string {
   const bytes = new TextEncoder().encode(str);
   let binary = "";
   for (let i = 0; i < bytes.byteLength; i++) {
-    binary += String.fromCharCode(bytes[i]);
+    binary += String.fromCharCode(bytes[i] ?? 0);
   }
   return btoa(binary).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, "");
 }
@@ -161,7 +161,7 @@ export function verifyJwt(token: string): JwtTokenPayload {
     throw new AuthError("Malformed JWT structure", "INVALID_TOKEN");
   }
   try {
-    const payload: JwtTokenPayload = JSON.parse(base64UrlDecode(parts[1]));
+    const payload: JwtTokenPayload = JSON.parse(base64UrlDecode(parts[1] || ""));
     const now = Math.floor(Date.now() / 1000);
     if (payload.exp && payload.exp < now) {
       throw new AuthError("Token has expired", "TOKEN_EXPIRED");
@@ -344,10 +344,11 @@ export async function resetPasswordWithToken(
   }
 
   const users = getStoredUsers();
-  if (users[email]) {
+  const user = users[email];
+  if (user) {
     const { hash, salt } = hashPassword(newPassword);
-    users[email].passwordHash = hash;
-    users[email].salt = salt;
+    user.passwordHash = hash;
+    user.salt = salt;
     saveStoredUsers(users);
   }
 

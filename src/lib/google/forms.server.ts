@@ -126,7 +126,7 @@ export async function getFormResponseSummary(
   formId: string,
 ): Promise<FormResponseSummaryStat> {
   const responses = await listResponses(accessToken, formId, 100);
-  const lastSubmitted = responses.length > 0 ? responses[0].submittedAt : null;
+  const lastSubmitted = responses.length > 0 ? (responses[0]?.submittedAt ?? null) : null;
   return {
     formId,
     totalResponses: responses.length,

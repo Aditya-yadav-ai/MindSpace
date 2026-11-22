@@ -96,7 +96,15 @@ export function OverviewView({
               {context.title ? context.title.slice(0, 22) + "..." : "No Page Attached"}
             </div>
             <p className="truncate text-xs text-muted-foreground">
-              {context.domain || "Click to capture tab"}
+              {context.url
+                ? (() => {
+                    try {
+                      return new URL(context.url).hostname;
+                    } catch {
+                      return context.url;
+                    }
+                  })()
+                : "Click to capture tab"}
             </p>
           </div>
         </Card3D>

@@ -17,8 +17,8 @@ import path from "node:path";
 let _db: DatabaseSync | null = null;
 
 function getDbPath(): string {
-  if (process.env.MINDSPACE_AUTH_DB_PATH) {
-    return process.env.MINDSPACE_AUTH_DB_PATH;
+  if (process.env["MINDSPACE_AUTH_DB_PATH"]) {
+    return process.env["MINDSPACE_AUTH_DB_PATH"];
   }
   const cwd = process.cwd();
   if (fs.existsSync(path.join(cwd, "apps/api/mas/outputs"))) {
@@ -183,6 +183,9 @@ export function verifyJwt(token: string, secret?: string): JwtTokenPayload {
     throw new Error("Invalid JWT token format");
   }
   const [headerB64, payloadB64, signatureB64] = parts;
+  if (!headerB64 || !payloadB64 || !signatureB64) {
+    throw new Error("Invalid JWT token format");
+  }
   const expectedSignature = createHmac("sha256", sec)
     .update(`${headerB64}.${payloadB64}`)
     .digest("base64url");

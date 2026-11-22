@@ -200,8 +200,8 @@ export async function calculateDistance(
     row.elements.forEach((elem, j) => {
       if (elem.status === "OK") {
         results.push({
-          origin: data.origin_addresses[i] || origins[i],
-          destination: data.destination_addresses[j] || destinations[j],
+          origin: (data.origin_addresses[i] ?? origins[i]) || "",
+          destination: (data.destination_addresses[j] ?? destinations[j]) || "",
           distanceText: elem.distance.text,
           distanceMeters: elem.distance.value,
           durationText: elem.duration.text,

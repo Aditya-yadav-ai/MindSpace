@@ -100,7 +100,7 @@ export function MindSpaceApp() {
 
     const { data } = supabase.auth.onAuthStateChange((_event, nextSession) => {
       setSession(nextSession);
-      if (nextSession?.user?.app_metadata?.role === "demo") {
+      if (nextSession?.user?.app_metadata?.["role"] === "demo") {
         setDemo(true);
       }
     });
@@ -711,23 +711,9 @@ export function Workspace({
         <div className="flex min-h-0 flex-1">
           <main className="scrollbar-slim flex-1 overflow-y-auto p-4 sm:p-6 lg:p-8">
             {view === "overview" && (
-              <OverviewView
-                onNavigate={selectView}
-                savedCount={savedPages.items.length}
-                hasContext={page.hasContent}
-                context={page.context}
-              />
+              <OverviewView name={user.name} onNavigate={selectView} context={page.context} />
             )}
-            {view === "capture" && (
-              <CurrentCaptureView
-                context={page.context}
-                hasContent={page.hasContent}
-                activeAction={page.activeAction}
-                onRunAction={page.runAction}
-                onClear={page.clear}
-                onSelectView={selectView}
-              />
-            )}
+            {view === "capture" && <CurrentCaptureView context={page.context} />}
             {view === "workspace" && (
               <MyWorkspaceView
                 context={page.context}

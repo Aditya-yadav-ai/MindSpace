@@ -98,7 +98,7 @@ function createSupabaseFallback() {
         options?: { data?: { full_name?: string } };
       }) {
         try {
-          const fullName = options?.data?.full_name || email.split("@")[0];
+          const fullName = options?.data?.full_name || email.split("@")[0] || "User";
           const res = await authSignUp({ data: { email, password, fullName } });
           await setClientSession(res.session, true);
           const sbSession = toSupabaseSession(res.session);
@@ -120,7 +120,9 @@ function createSupabaseFallback() {
       async signOut() {
         try {
           const current = getClientSession();
-          await authSignOut({ data: { refreshToken: current?.refresh_token } });
+          await authSignOut({
+            data: current?.refresh_token ? { refreshToken: current.refresh_token } : {},
+          });
         } catch {
           // Ignore
         }

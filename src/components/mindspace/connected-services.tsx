@@ -44,7 +44,7 @@ export function ConnectedServices({
   userEmail,
 }: {
   signedIn: boolean;
-  userEmail?: string;
+  userEmail?: string | undefined;
 }) {
   const fetchStatus = useServerFn(getGoogleStatus);
   const fetchAuthUrl = useServerFn(getGoogleAuthUrl);

@@ -254,9 +254,10 @@ export class GoogleMapsAgent extends BaseAgent {
         destination: input.destination,
       })) as DirectionRoute[];
 
+      const first = routes[0];
       return {
-        summary: routes.length
-          ? `Route from ${input.origin} to ${input.destination}: ${routes[0].distanceText}, ~${routes[0].durationText}.`
+        summary: first
+          ? `Route from ${input.origin} to ${input.destination}: ${first.distanceText}, ~${first.durationText}.`
           : "No routes found.",
         output: { routes },
       };

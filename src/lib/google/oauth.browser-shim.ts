@@ -37,7 +37,7 @@ export async function createAuthorizationUrl(
   _userEmail?: string,
 ): Promise<string> {
   const clientId =
-    (typeof process !== "undefined" && process.env?.GOOGLE_CLIENT_ID) ||
+    (typeof process !== "undefined" && process.env?.["GOOGLE_CLIENT_ID"]) ||
     "mindspace-extension-client-id";
   const redirectUri =
     (typeof chrome !== "undefined" &&
@@ -70,9 +70,10 @@ export async function getConnectionStatus(_userId: string): Promise<GoogleConnec
       if (conn && conn.googleEmail) {
         return {
           connected: true,
-          email: conn.googleEmail,
-          scopes: typeof conn.scopes === "string" ? conn.scopes.split(" ") : conn.scopes,
+          googleEmail: conn.googleEmail,
+          scope: typeof conn.scopes === "string" ? conn.scopes.split(" ") : conn.scopes || [],
           connectedAt: conn.updatedAt || new Date().toISOString(),
+          expiresSoon: false,
         };
       }
     } catch {
