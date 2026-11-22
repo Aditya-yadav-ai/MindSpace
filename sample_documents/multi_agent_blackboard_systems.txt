@@ -23,3 +23,4 @@ When external LLM inference providers experience rate limits or network partitio
 - Untrusted web content is sanitized using strict character encoding.
 - Lexical document retrieval uses deterministic hashed bag-of-words vectors (`hash-bow-v1`).
 - Responses are transparently labelled with `[SIMULATED]` provenance headers to preserve research integrity.
+

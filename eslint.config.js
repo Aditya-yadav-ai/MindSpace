@@ -13,6 +13,7 @@ export default tseslint.config(
       ".vinxi",
       "dist-extension",
       "backups",
+      ".venv/**",
       "apps/api/.venv/**",
       "apps/api/.venv*/**",
     ],

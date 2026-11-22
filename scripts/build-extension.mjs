@@ -145,6 +145,12 @@ async function buildExtension() {
     "http://127.0.0.1:8000/*",
     "http://localhost:8000/*",
   ];
+  manifest.web_accessible_resources = [
+    {
+      resources: ["standard_fonts/*", "cmaps/*", "assets/*"],
+      matches: ["<all_urls>"],
+    },
+  ];
 
   // Update public/manifest.json to keep source synchronized
   fs.writeFileSync(manifestPath, JSON.stringify(manifest, null, 2) + "\n");
@@ -182,6 +188,20 @@ async function buildExtension() {
     }
   }
 
+  // Copy directory assets (standard_fonts, cmaps for PDF.js) into dist-extension/
+  const dirsToCopy = ["standard_fonts", "cmaps"];
+  for (const dir of dirsToCopy) {
+    const src = path.join(PUBLIC_DIR, dir);
+    const dest = path.join(DIST_EXT_DIR, dir);
+    if (fs.existsSync(src)) {
+      fs.cpSync(src, dest, { recursive: true });
+      const count = fs.readdirSync(dest).length;
+      console.log(`[copy-dir] ${dir.padEnd(22)} -> ${count} files copied`);
+    } else {
+      console.warn(`[warning] Source directory missing: ${src}`);
+    }
+  }
+
   // Provide a backwards-compatible sidepanel.js bridge in dist-extension
   const bridgePath = path.join(DIST_EXT_DIR, "sidepanel.js");
   if (!fs.existsSync(bridgePath)) {
@@ -211,6 +231,8 @@ async function buildExtension() {
     { label: "Icon 16px", file: manifest.icons?.["16"] },
     { label: "Icon 48px", file: manifest.icons?.["48"] },
     { label: "Icon 128px", file: manifest.icons?.["128"] },
+    { label: "Standard Fonts Asset", file: "standard_fonts/LiberationSans-Regular.ttf" },
+    { label: "CMap Asset", file: "cmaps/78-EUC-H.bcmap" },
   ];
 
   let allOk = true;

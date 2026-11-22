@@ -66,6 +66,15 @@ test("MindSpace Extension MV3 Contract & Syntax Verification", async (t) => {
     assert.ok(manifest.commands?.capture_screenshot, "Must register capture_screenshot command");
     assert.equal(manifest.commands.capture_screenshot.suggested_key?.default, "Alt+B");
     assert.equal(manifest.commands.capture_screenshot.suggested_key?.mac, "Alt+B");
+
+    // Web accessible resources (PDF.js fonts and cmaps)
+    assert.ok(
+      Array.isArray(manifest.web_accessible_resources),
+      "Must declare web_accessible_resources",
+    );
+    const warResources = manifest.web_accessible_resources.flatMap((r) => r.resources || []);
+    assert.ok(warResources.includes("standard_fonts/*"), "Must expose standard_fonts/*");
+    assert.ok(warResources.includes("cmaps/*"), "Must expose cmaps/*");
   });
 
   await t.test("extension background service worker syntax is valid", () => {
@@ -179,6 +188,273 @@ test("Chrome Real-Browser Loading Verification", async (t) => {
         !stderr.includes("reserved for use by the system"),
         `Chrome complained about reserved filename: ${stderr}`,
       );
+    },
+  );
+
+  await t.test(
+    "sidepanel loads in real Chrome with zero uncaught runtime exceptions (no fileURLToPath errors)",
+    async () => {
+      const http = await import("node:http");
+      const sidepanelFile = path.join(DIST_EXT_DIR, "sidepanel.html");
+      const sidepanelUrl = "file:///" + sidepanelFile.replace(/\\/g, "/");
+      const tempProfileDir = fs.mkdtempSync(path.join(os.tmpdir(), "mindspace-chrome-cdp-"));
+
+      const args = [
+        "--remote-debugging-port=9235",
+        "--headless=new",
+        "--disable-gpu",
+        "--allow-file-access-from-files",
+        "--no-sandbox",
+        "--disable-web-security",
+        `--user-data-dir=${tempProfileDir}`,
+        sidepanelUrl,
+      ];
+
+      const proc = spawn(browserBinary, args, { stdio: ["ignore", "pipe", "pipe"] });
+      await new Promise((resolve) => setTimeout(resolve, 2500));
+
+      try {
+        const targets = await new Promise((resolve, reject) => {
+          http
+            .get("http://127.0.0.1:9235/json", (res) => {
+              let data = "";
+              res.on("data", (chunk) => (data += chunk));
+              res.on("end", () => resolve(JSON.parse(data)));
+            })
+            .on("error", reject);
+        });
+
+        const target = targets.find((tg) => tg.url && tg.url.includes("sidepanel.html"));
+        assert.ok(target, "Sidepanel page target must be active in Chrome");
+
+        const ws = new WebSocket(target.webSocketDebuggerUrl);
+        const exceptions = [];
+
+        const result = await new Promise((resolve, reject) => {
+          ws.addEventListener("open", () => {
+            ws.send(JSON.stringify({ id: 1, method: "Runtime.enable" }));
+            ws.send(JSON.stringify({ id: 2, method: "Console.enable" }));
+            setTimeout(() => {
+              ws.send(
+                JSON.stringify({
+                  id: 10,
+                  method: "Runtime.evaluate",
+                  params: { expression: "document.getElementById('root')?.innerHTML || ''" },
+                }),
+              );
+            }, 1500);
+          });
+
+          ws.addEventListener("message", (event) => {
+            const msg = JSON.parse(event.data);
+            if (msg.method === "Runtime.exceptionThrown") {
+              exceptions.push(msg.params?.exceptionDetails);
+            }
+            if (msg.id === 10) {
+              resolve(msg.result?.result?.value || "");
+            }
+          });
+
+          ws.addEventListener("error", reject);
+        });
+
+        ws.close();
+
+        // 1. Verify React root has mounted the application UI
+        assert.ok(result.length > 500, "React app must mount in #root");
+        assert.ok(
+          result.includes("MindSpace") || result.includes("Welcome"),
+          "Must contain MindSpace UI",
+        );
+
+        // 2. Verify zero uncaught exceptions
+        assert.equal(
+          exceptions.length,
+          0,
+          `Chrome threw uncaught exceptions: ${JSON.stringify(exceptions)}`,
+        );
+
+        // 3. Specifically assert no fileURLToPath errors
+        const hasFileUrlError = exceptions.some((e) =>
+          (e?.exception?.description || "").includes("fileURLToPath"),
+        );
+        assert.equal(hasFileUrlError, false, "Must have zero fileURLToPath runtime errors");
+      } finally {
+        proc.kill("SIGKILL");
+        try {
+          fs.rmSync(tempProfileDir, { recursive: true, force: true });
+        } catch {}
+      }
+    },
+  );
+
+  await t.test(
+    "extracts text from standard-font PDF in browser context without standardFontDataUrl warnings",
+    async () => {
+      const http = await import("node:http");
+      const sidepanelFile = path.join(DIST_EXT_DIR, "sidepanel.html");
+      const sidepanelUrl = "file:///" + sidepanelFile.replace(/\\/g, "/");
+      const tempProfileDir = fs.mkdtempSync(path.join(os.tmpdir(), "mindspace-chrome-pdf-"));
+
+      // Discover the actual PDF and worker chunk filenames from the built assets
+      const assetsDir = path.join(DIST_EXT_DIR, "assets");
+      const assetFiles = fs.readdirSync(assetsDir);
+      const pdfChunkFile = assetFiles.find((f) => /^pdf-[a-zA-Z0-9_-]+\.js$/.test(f));
+      const workerChunkFile = assetFiles.find((f) =>
+        /^pdf\.worker\.min-[a-zA-Z0-9_-]+\.mjs$/.test(f),
+      );
+      assert.ok(pdfChunkFile, "PDF chunk must exist in dist-extension/assets");
+      assert.ok(workerChunkFile, "PDF worker chunk must exist in dist-extension/assets");
+
+      const MINIMAL_PDF = `%PDF-1.4
+1 0 obj
+<< /Type /Catalog /Pages 2 0 R >>
+endobj
+2 0 obj
+<< /Type /Pages /Kids [3 0 R] /Count 1 >>
+endobj
+3 0 obj
+<< /Type /Page /Parent 2 0 R /MediaBox [0 0 612 792] /Contents 4 0 R /Resources << /Font << /F1 5 0 R >> >> >>
+endobj
+4 0 obj
+<< /Length 55 >>
+stream
+BT
+/F1 24 Tf
+100 700 Td
+(MindSpace Offline PDF Intelligence) Tj
+ET
+endstream
+endobj
+5 0 obj
+<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica >>
+endobj
+xref
+0 6
+0000000000 65535 f 
+0000000009 00000 n 
+0000000058 00000 n 
+0000000115 00000 n 
+0000000227 00000 n 
+0000000332 00000 n 
+trailer
+<< /Size 6 /Root 1 0 R >>
+startxref
+407
+%%EOF`;
+
+      const args = [
+        "--remote-debugging-port=9236",
+        "--headless=new",
+        "--disable-gpu",
+        "--allow-file-access-from-files",
+        "--no-sandbox",
+        "--disable-web-security",
+        `--user-data-dir=${tempProfileDir}`,
+        sidepanelUrl,
+      ];
+
+      const proc = spawn(browserBinary, args, { stdio: ["ignore", "pipe", "pipe"] });
+      await new Promise((resolve) => setTimeout(resolve, 2500));
+
+      try {
+        const targets = await new Promise((resolve, reject) => {
+          http
+            .get("http://127.0.0.1:9236/json", (res) => {
+              let data = "";
+              res.on("data", (chunk) => (data += chunk));
+              res.on("end", () => resolve(JSON.parse(data)));
+            })
+            .on("error", reject);
+        });
+
+        const target = targets.find((tg) => tg.url && tg.url.includes("sidepanel.html"));
+        assert.ok(target, "Sidepanel page target must be active in Chrome");
+
+        const ws = new WebSocket(target.webSocketDebuggerUrl);
+        const pdfBase64 = Buffer.from(MINIMAL_PDF).toString("base64");
+
+        const pdfExpr = `
+          (async () => {
+            const warnings = [];
+            const originalWarn = console.warn;
+            console.warn = (...args) => {
+              warnings.push(args.join(" "));
+              originalWarn(...args);
+            };
+
+            try {
+              const baseUrl = window.location.href.substring(0, window.location.href.lastIndexOf('/') + 1);
+              const pdfjs = await import(baseUrl + 'assets/${pdfChunkFile}');
+              const binary = atob('${pdfBase64}');
+              const bytes = new Uint8Array(binary.length);
+              for (let i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i);
+
+              pdfjs.GlobalWorkerOptions.workerSrc = baseUrl + 'assets/${workerChunkFile}';
+
+              const task = pdfjs.getDocument({
+                data: bytes,
+                standardFontDataUrl: baseUrl + 'standard_fonts/',
+                cMapUrl: baseUrl + 'cmaps/',
+                cMapPacked: true,
+                useWorkerFetch: false,
+                isEvalSupported: false,
+                useSystemFonts: true,
+              });
+
+              const doc = await task.promise;
+              const page = await doc.getPage(1);
+              const textContent = await page.getTextContent();
+              const extracted = textContent.items.map(item => item.str).join(' ').trim();
+
+              console.warn = originalWarn;
+              return { extracted, warnings, success: true };
+            } catch (err) {
+              console.warn = originalWarn;
+              return { error: err.message, warnings, success: false };
+            }
+          })()
+        `;
+
+        const evalResult = await new Promise((resolve, reject) => {
+          ws.addEventListener("open", () => {
+            ws.send(JSON.stringify({ id: 1, method: "Runtime.enable" }));
+            setTimeout(() => {
+              ws.send(
+                JSON.stringify({
+                  id: 20,
+                  method: "Runtime.evaluate",
+                  params: { expression: pdfExpr, awaitPromise: true, returnByValue: true },
+                }),
+              );
+            }, 1000);
+          });
+
+          ws.addEventListener("message", (event) => {
+            const msg = JSON.parse(event.data);
+            if (msg.id === 20) {
+              resolve(msg.result?.result?.value);
+            }
+          });
+
+          ws.addEventListener("error", reject);
+        });
+
+        ws.close();
+
+        assert.ok(evalResult?.success, `PDF extraction failed: ${evalResult?.error}`);
+        assert.equal(evalResult?.extracted, "MindSpace Offline PDF Intelligence");
+
+        const hasFontWarning = (evalResult?.warnings || []).some((w) =>
+          w.includes("standardFontDataUrl API parameter is provided"),
+        );
+        assert.equal(hasFontWarning, false, "Must not emit standardFontDataUrl warning");
+      } finally {
+        proc.kill("SIGKILL");
+        try {
+          fs.rmSync(tempProfileDir, { recursive: true, force: true });
+        } catch {}
+      }
     },
   );
 });

@@ -1,6 +1,23 @@
 import { createFileRoute } from "@tanstack/react-router";
 import type { Session } from "@supabase/supabase-js";
-import { Laptop, LoaderCircle, LogOut, Moon, ShieldCheck, Sun } from "lucide-react";
+import {
+  AlertCircle,
+  ArrowRight,
+  CheckCircle2,
+  Eye,
+  EyeOff,
+  KeyRound,
+  Laptop,
+  LoaderCircle,
+  Lock,
+  LogOut,
+  Mail,
+  Moon,
+  ShieldCheck,
+  Sparkles,
+  Sun,
+  User,
+} from "lucide-react";
 import { useEffect, useState, type FormEvent } from "react";
 import { AgentActivity } from "@/components/mindspace/agent-activity";
 import { ApprovalsView } from "@/components/mindspace/approvals-view";
@@ -8,7 +25,6 @@ import { AskMindSpaceView } from "@/components/mindspace/ask-mindspace-view";
 import { AutomationsPanel } from "@/components/mindspace/automations-panel";
 import { CollectionsView } from "@/components/mindspace/collections-view";
 import { ConnectedAccountsView } from "@/components/mindspace/connected-accounts-view";
-import { ConnectedServices } from "@/components/mindspace/connected-services";
 import { CurrentCaptureView } from "@/components/mindspace/current-capture-view";
 import { HistoryPanel } from "@/components/mindspace/history-panel";
 import { KnowledgeBase } from "@/components/mindspace/knowledge-base";
@@ -31,6 +47,8 @@ import { lovable } from "@/integrations/lovable";
 import { supabase } from "@/integrations/supabase/client";
 import { useTheme } from "@/lib/theme";
 import { cn } from "@/lib/utils";
+import { authCreateDemoSession, authForgotPassword, authResetPassword } from "@/lib/auth.functions";
+import { loadClientSession, setClientSession, clearClientSession } from "@/lib/auth-client";
 
 export const Route = createFileRoute("/")({
   head: () => ({
@@ -52,232 +70,460 @@ export const Route = createFileRoute("/")({
   component: MindSpaceApp,
 });
 
-type AuthMode = "signin" | "signup";
+type AuthMode = "signin" | "signup" | "forgot" | "reset";
 
 export function MindSpaceApp() {
   const [session, setSession] = useState<Session | null>(null);
   const [checking, setChecking] = useState(true);
-  const isExtension =
-    typeof window !== "undefined" && typeof chrome !== "undefined" && Boolean(chrome?.runtime?.id);
-  const [demo, setDemo] = useState(isExtension);
+  const [demo, setDemo] = useState(false);
 
   useEffect(() => {
-    void supabase.auth.getSession().then(({ data }) => {
-      setSession(data.session);
+    void (async () => {
+      // 1. Check client session storage (localStorage or extension storage)
+      const stored = await loadClientSession();
+      if (stored && stored.user) {
+        if (stored.user.role === "demo") {
+          setDemo(true);
+        }
+        const { data } = await supabase.auth.getSession();
+        if (data.session) {
+          setSession(data.session);
+        }
+      } else {
+        const { data } = await supabase.auth.getSession();
+        if (data.session) {
+          setSession(data.session);
+        }
+      }
       setChecking(false);
+    })();
+
+    const { data } = supabase.auth.onAuthStateChange((_event, nextSession) => {
+      setSession(nextSession);
+      if (nextSession?.user?.app_metadata?.role === "demo") {
+        setDemo(true);
+      }
     });
-    const { data } = supabase.auth.onAuthStateChange((_event, nextSession) =>
-      setSession(nextSession),
-    );
     return () => data.subscription.unsubscribe();
   }, []);
 
   if (checking) {
     return (
       <div className="grid min-h-dvh place-items-center bg-background text-foreground">
-        <LoaderCircle className="size-5 animate-spin" aria-label="Loading MindSpace" />
+        <div className="flex flex-col items-center gap-3">
+          <LoaderCircle
+            className="size-6 animate-spin text-primary"
+            aria-label="Loading MindSpace"
+          />
+          <p className="text-xs text-muted-foreground font-mono">Authenticating MindSpace...</p>
+        </div>
       </div>
     );
   }
 
-  if (!session && !demo) return <AuthScreen onPreview={() => setDemo(true)} />;
+  // Authentication-First Gate: Unauthenticated users MUST see the Login/Signup screen.
+  if (!session && !demo) {
+    return (
+      <AuthScreen
+        onAuthenticated={(newSession) => {
+          setSession(newSession);
+          setDemo(false);
+        }}
+        onEnterDemo={async () => {
+          try {
+            const res = await authCreateDemoSession({});
+            await setClientSession(res.session, false);
+            setDemo(true);
+          } catch {
+            setDemo(true);
+          }
+        }}
+      />
+    );
+  }
 
-  return <Workspace session={session} onExitDemo={() => setDemo(false)} />;
+  return (
+    <Workspace
+      session={session}
+      isDemo={demo}
+      onSignOut={async () => {
+        try {
+          await supabase.auth.signOut();
+        } catch {
+          // Ignore
+        }
+        await clearClientSession();
+        setSession(null);
+        setDemo(false);
+      }}
+    />
+  );
 }
 
 /* -------------------------------------------------------------------------- */
-/* Authentication                                                            */
+/* Polished MindSpace Authentication Screen                                   */
 /* -------------------------------------------------------------------------- */
 
-function AuthScreen({ onPreview }: { onPreview: () => void }) {
+function AuthScreen({
+  onAuthenticated,
+  onEnterDemo,
+}: {
+  onAuthenticated: (session: Session) => void;
+  onEnterDemo: () => void;
+}) {
   const [mode, setMode] = useState<AuthMode>("signin");
+  const [fullName, setFullName] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
+  const [confirmPassword, setConfirmPassword] = useState("");
+  const [resetToken, setResetToken] = useState("");
+  const [showPassword, setShowPassword] = useState(false);
+  const [rememberMe, setRememberMe] = useState(true);
   const [busy, setBusy] = useState(false);
-  const [message, setMessage] = useState<string | null>(null);
+  const [errorMsg, setErrorMsg] = useState<string | null>(null);
+  const [successMsg, setSuccessMsg] = useState<string | null>(null);
+
+  function resetState() {
+    setErrorMsg(null);
+    setSuccessMsg(null);
+    setPassword("");
+    setConfirmPassword("");
+  }
 
   async function submit(event: FormEvent) {
     event.preventDefault();
     setBusy(true);
-    setMessage(null);
-    const result =
-      mode === "signin"
-        ? await supabase.auth.signInWithPassword({ email, password })
-        : await supabase.auth.signUp({
-            email,
-            password,
-            options: { data: { full_name: email.split("@")[0] } },
-          });
-    setBusy(false);
-    if (result.error) return setMessage(result.error.message);
-    if (mode === "signup" && !result.data.session)
-      setMessage("Check your email to confirm your account, then sign in.");
-  }
-
-  async function googleSignIn() {
-    setBusy(true);
-    setMessage(null);
+    setErrorMsg(null);
+    setSuccessMsg(null);
 
     try {
-      const supabaseResult = await supabase.auth.signInWithOAuth({
-        provider: "google",
-        options: {
-          redirectTo: window.location.origin,
-          queryParams: {
-            access_type: "offline",
-            prompt: "consent",
-          },
-        },
-      });
-
-      if (supabaseResult.error) {
-        throw new Error(supabaseResult.error.message);
-      }
-
-      if (supabaseResult.data?.url) {
-        window.location.href = supabaseResult.data.url;
-      }
-      return;
-    } catch (supabaseError) {
-      const supabaseMessage =
-        supabaseError instanceof Error ? supabaseError.message : "Google sign-in failed.";
-
-      try {
-        const fallbackResult = await lovable.auth.signInWithOAuth("google", {
-          redirect_uri: window.location.origin,
-        });
-
-        if (fallbackResult.error) {
-          throw new Error(fallbackResult.error.message);
+      if (mode === "signin") {
+        const result = await supabase.auth.signInWithPassword({ email, password });
+        if (result.error) {
+          setErrorMsg(result.error.message);
+          setBusy(false);
+          return;
         }
-        return;
-      } catch (fallbackError) {
-        const fallbackMessage =
-          fallbackError instanceof Error ? fallbackError.message : "Google sign-in failed.";
-        setMessage(`${supabaseMessage}. ${fallbackMessage}`);
-        setBusy(false);
-        return;
+        if (result.data.session) {
+          onAuthenticated(result.data.session);
+        }
+      } else if (mode === "signup") {
+        if (password !== confirmPassword) {
+          setErrorMsg("Passwords do not match. Please verify.");
+          setBusy(false);
+          return;
+        }
+        const result = await supabase.auth.signUp({
+          email,
+          password,
+          options: { data: { full_name: fullName.trim() || email.split("@")[0] } },
+        });
+        if (result.error) {
+          setErrorMsg(result.error.message);
+          setBusy(false);
+          return;
+        }
+        if (result.data.session) {
+          onAuthenticated(result.data.session);
+        } else {
+          setSuccessMsg("Account created! Please sign in with your credentials.");
+          setMode("signin");
+        }
+      } else if (mode === "forgot") {
+        const res = await authForgotPassword({ data: { email } });
+        setSuccessMsg(res.message);
+      } else if (mode === "reset") {
+        if (password !== confirmPassword) {
+          setErrorMsg("Passwords do not match.");
+          setBusy(false);
+          return;
+        }
+        const res = await authResetPassword({ data: { token: resetToken, newPassword: password } });
+        setSuccessMsg(res.message);
+        setMode("signin");
       }
+    } catch (err) {
+      setErrorMsg(
+        err instanceof Error ? err.message : "An unexpected authentication error occurred.",
+      );
+    } finally {
+      setBusy(false);
     }
-
-    setBusy(false);
   }
 
   return (
-    <main className="grid min-h-dvh place-items-center bg-background px-4 py-10">
-      <section className="grid w-full max-w-4xl overflow-hidden rounded-2xl border border-border bg-card shadow-[0_24px_60px_-40px_oklch(0.235_0.019_264/0.5)] md:grid-cols-[1fr_1fr]">
+    <main className="grid min-h-dvh place-items-center bg-background px-4 py-8">
+      <section className="grid w-full max-w-4xl overflow-hidden rounded-2xl border border-border/80 bg-card shadow-[0_24px_60px_-40px_rgba(0,0,0,0.6)] md:grid-cols-[1.1fr_1fr]">
+        {/* Left Branding Showcase */}
         <div className="hidden flex-col justify-between bg-navy p-8 text-navy-foreground md:flex">
           <BrandMark />
 
-          <div>
-            <p className="font-mono text-[10.5px] uppercase tracking-[0.18em] text-navy-muted">
-              Browser workspace
-            </p>
-            <h1 className="mt-4 max-w-xs text-[34px] font-semibold leading-[1.15]">
-              A quieter place to think with the web.
+          <div className="space-y-4">
+            <div className="inline-flex items-center gap-2 rounded-full border border-blue-400/20 bg-blue-500/10 px-3 py-1 text-[11px] font-mono uppercase tracking-wider text-blue-300">
+              <Sparkles className="size-3" />
+              <span>Multimodal AI Browser Assistant</span>
+            </div>
+            <h1 className="text-[30px] font-bold leading-tight text-white">
+              Private, grounded intelligence for everything you read.
             </h1>
-            <p className="mt-4 max-w-xs text-[13px] leading-6 text-navy-muted">
-              Bring in the page you are reading and MindSpace will summarize it, explain it or pull
-              out the key facts.
+            <p className="text-[13px] leading-relaxed text-navy-muted">
+              Analyze webpages, query 14 integrated Google services, synthesize notes, and
+              orchestrate multi-agent workflows from Chrome side panel.
             </p>
           </div>
 
-          <p className="flex items-start gap-2 text-[11.5px] leading-5 text-navy-muted">
-            <ShieldCheck className="mt-0.5 size-3.5 shrink-0" aria-hidden="true" />
-            MindSpace only reads the page text you add. It cannot browse, click or act for you.
-          </p>
+          <div className="space-y-2 border-t border-navy-muted/20 pt-4 text-[11.5px] text-navy-muted">
+            <p className="flex items-center gap-2">
+              <ShieldCheck className="size-4 text-emerald-400" />
+              <span>Strict same-email Google Account linking</span>
+            </p>
+            <p className="flex items-center gap-2">
+              <Lock className="size-4 text-blue-400" />
+              <span>AES-256-GCM encrypted credential vault</span>
+            </p>
+          </div>
         </div>
 
-        <div className="px-6 py-9 sm:px-10">
-          <div className="mb-8 md:hidden">
-            <BrandMark dark />
-          </div>
+        {/* Right Form Container */}
+        <div className="flex flex-col justify-between px-6 py-8 sm:px-10">
+          <div>
+            <div className="mb-6 flex items-center justify-between">
+              <BrandMark dark />
+              <span className="rounded-md border border-border bg-muted/40 px-2 py-0.5 text-[10.5px] font-mono text-muted-foreground">
+                MV3 Stage 8
+              </span>
+            </div>
 
-          <p className="font-mono text-[10.5px] uppercase tracking-[0.18em] text-primary">
-            {mode === "signin" ? "Welcome back" : "Create your space"}
-          </p>
-          <h2 className="mt-2 text-[24px] font-semibold text-foreground">
-            {mode === "signin" ? "Sign in to MindSpace" : "Start with MindSpace"}
-          </h2>
-          <p className="mt-2 text-[13px] text-muted-foreground">
-            {mode === "signin"
-              ? "Continue to your browser workspace."
-              : "Your account keeps future context private and in sync."}
-          </p>
-
-          <form onSubmit={submit} className="mt-6 space-y-4">
-            <label className="block text-[11.5px] font-medium text-foreground">
-              Email
-              <input
-                required
-                type="email"
-                value={email}
-                onChange={(event) => setEmail(event.target.value)}
-                placeholder="you@example.com"
-                autoComplete="email"
-                className="mt-1.5 h-10 w-full rounded-lg border border-input bg-background px-3 text-[13px] outline-none transition-colors focus:border-primary focus:ring-2 focus:ring-primary/15"
-              />
-            </label>
-            <label className="block text-[11.5px] font-medium text-foreground">
-              Password
-              <input
-                required
-                minLength={6}
-                type="password"
-                value={password}
-                onChange={(event) => setPassword(event.target.value)}
-                placeholder="At least 6 characters"
-                autoComplete={mode === "signin" ? "current-password" : "new-password"}
-                className="mt-1.5 h-10 w-full rounded-lg border border-input bg-background px-3 text-[13px] outline-none transition-colors focus:border-primary focus:ring-2 focus:ring-primary/15"
-              />
-            </label>
-            {message && (
-              <p
-                className="rounded-lg border border-border bg-muted px-3 py-2 text-[11.5px] leading-5 text-secondary-foreground"
-                role="status"
-              >
-                {message}
+            {/* Mode Titles */}
+            <div className="space-y-1">
+              <h2 className="text-xl font-bold tracking-tight text-foreground">
+                {mode === "signin" && "Sign in to MindSpace"}
+                {mode === "signup" && "Create your MindSpace account"}
+                {mode === "forgot" && "Reset your password"}
+                {mode === "reset" && "Set new password"}
+              </h2>
+              <p className="text-xs text-muted-foreground">
+                {mode === "signin" && "Enter your credentials to access your browser workspace."}
+                {mode === "signup" && "Sign up to synchronize notes and link your Google services."}
+                {mode === "forgot" && "Enter your account email to receive reset instructions."}
+                {mode === "reset" && "Enter your reset token and new password."}
               </p>
-            )}
-            <Button className="w-full" disabled={busy}>
-              {busy && <LoaderCircle className="animate-spin" />}
-              {mode === "signin" ? "Sign in" : "Create account"}
-            </Button>
-          </form>
+            </div>
 
-          <div className="my-5 flex items-center gap-3 text-[10px] uppercase tracking-[0.14em] text-muted-foreground before:h-px before:flex-1 before:bg-border after:h-px after:flex-1 after:bg-border">
-            or
+            {/* Error & Success Banners */}
+            {errorMsg && (
+              <div className="mt-4 flex items-start gap-2 rounded-lg border border-destructive/30 bg-destructive/10 p-3 text-xs text-destructive">
+                <AlertCircle className="mt-0.5 size-4 shrink-0" />
+                <span className="leading-snug">{errorMsg}</span>
+              </div>
+            )}
+            {successMsg && (
+              <div className="mt-4 flex items-start gap-2 rounded-lg border border-emerald-500/30 bg-emerald-500/10 p-3 text-xs text-emerald-600 dark:text-emerald-400">
+                <CheckCircle2 className="mt-0.5 size-4 shrink-0" />
+                <span className="leading-snug">{successMsg}</span>
+              </div>
+            )}
+
+            {/* Form */}
+            <form onSubmit={submit} className="mt-5 space-y-3.5">
+              {mode === "signup" && (
+                <div>
+                  <label className="block text-[11px] font-medium text-foreground mb-1">
+                    Full Name
+                  </label>
+                  <div className="relative">
+                    <User className="absolute left-3 top-2.5 size-4 text-muted-foreground" />
+                    <input
+                      required
+                      type="text"
+                      value={fullName}
+                      onChange={(e) => setFullName(e.target.value)}
+                      placeholder="Jane Doe"
+                      className="h-9 w-full rounded-lg border border-input bg-background pl-9 pr-3 text-xs outline-none transition-colors focus:border-primary focus:ring-1 focus:ring-primary"
+                    />
+                  </div>
+                </div>
+              )}
+
+              {mode !== "reset" && (
+                <div>
+                  <label className="block text-[11px] font-medium text-foreground mb-1">
+                    Email Address
+                  </label>
+                  <div className="relative">
+                    <Mail className="absolute left-3 top-2.5 size-4 text-muted-foreground" />
+                    <input
+                      required
+                      type="email"
+                      value={email}
+                      onChange={(e) => setEmail(e.target.value)}
+                      placeholder="name@example.com"
+                      autoComplete="email"
+                      className="h-9 w-full rounded-lg border border-input bg-background pl-9 pr-3 text-xs outline-none transition-colors focus:border-primary focus:ring-1 focus:ring-primary"
+                    />
+                  </div>
+                </div>
+              )}
+
+              {mode === "reset" && (
+                <div>
+                  <label className="block text-[11px] font-medium text-foreground mb-1">
+                    Reset Token
+                  </label>
+                  <div className="relative">
+                    <KeyRound className="absolute left-3 top-2.5 size-4 text-muted-foreground" />
+                    <input
+                      required
+                      type="text"
+                      value={resetToken}
+                      onChange={(e) => setResetToken(e.target.value)}
+                      placeholder="Paste your reset token"
+                      className="h-9 w-full rounded-lg border border-input bg-background pl-9 pr-3 text-xs outline-none transition-colors focus:border-primary focus:ring-1 focus:ring-primary"
+                    />
+                  </div>
+                </div>
+              )}
+
+              {mode !== "forgot" && (
+                <div>
+                  <div className="flex items-center justify-between mb-1">
+                    <label className="block text-[11px] font-medium text-foreground">
+                      {mode === "reset" ? "New Password" : "Password"}
+                    </label>
+                    {mode === "signin" && (
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setMode("forgot");
+                          resetState();
+                        }}
+                        className="text-[11px] text-primary hover:underline"
+                      >
+                        Forgot password?
+                      </button>
+                    )}
+                  </div>
+                  <div className="relative">
+                    <Lock className="absolute left-3 top-2.5 size-4 text-muted-foreground" />
+                    <input
+                      required
+                      minLength={6}
+                      type={showPassword ? "text" : "password"}
+                      value={password}
+                      onChange={(e) => setPassword(e.target.value)}
+                      placeholder="••••••••"
+                      autoComplete={mode === "signin" ? "current-password" : "new-password"}
+                      className="h-9 w-full rounded-lg border border-input bg-background pl-9 pr-9 text-xs outline-none transition-colors focus:border-primary focus:ring-1 focus:ring-primary"
+                    />
+                    <button
+                      type="button"
+                      onClick={() => setShowPassword((s) => !s)}
+                      className="absolute right-2.5 top-2.5 text-muted-foreground hover:text-foreground"
+                    >
+                      {showPassword ? <EyeOff className="size-4" /> : <Eye className="size-4" />}
+                    </button>
+                  </div>
+                </div>
+              )}
+
+              {(mode === "signup" || mode === "reset") && (
+                <div>
+                  <label className="block text-[11px] font-medium text-foreground mb-1">
+                    Confirm Password
+                  </label>
+                  <div className="relative">
+                    <Lock className="absolute left-3 top-2.5 size-4 text-muted-foreground" />
+                    <input
+                      required
+                      minLength={6}
+                      type={showPassword ? "text" : "password"}
+                      value={confirmPassword}
+                      onChange={(e) => setConfirmPassword(e.target.value)}
+                      placeholder="••••••••"
+                      autoComplete="new-password"
+                      className="h-9 w-full rounded-lg border border-input bg-background pl-9 pr-9 text-xs outline-none transition-colors focus:border-primary focus:ring-1 focus:ring-primary"
+                    />
+                  </div>
+                </div>
+              )}
+
+              {mode === "signin" && (
+                <div className="flex items-center gap-2 pt-1">
+                  <input
+                    type="checkbox"
+                    id="rememberMe"
+                    checked={rememberMe}
+                    onChange={(e) => setRememberMe(e.target.checked)}
+                    className="size-3.5 rounded border-border text-primary focus:ring-primary"
+                  />
+                  <label htmlFor="rememberMe" className="text-[11.5px] text-muted-foreground">
+                    Keep me signed in
+                  </label>
+                </div>
+              )}
+
+              <Button className="w-full mt-2" disabled={busy}>
+                {busy && <LoaderCircle className="size-4 animate-spin mr-1.5" />}
+                {mode === "signin" && "Sign In"}
+                {mode === "signup" && "Create Account"}
+                {mode === "forgot" && "Send Reset Link"}
+                {mode === "reset" && "Update Password"}
+              </Button>
+            </form>
+
+            {/* Switch Mode Links */}
+            <div className="mt-4 flex flex-col gap-2 text-xs">
+              {mode === "signin" ? (
+                <button
+                  type="button"
+                  onClick={() => {
+                    setMode("signup");
+                    resetState();
+                  }}
+                  className="text-muted-foreground hover:text-foreground transition-colors text-left"
+                >
+                  New to MindSpace?{" "}
+                  <span className="font-semibold text-primary">Create an account</span>
+                </button>
+              ) : (
+                <button
+                  type="button"
+                  onClick={() => {
+                    setMode("signin");
+                    resetState();
+                  }}
+                  className="text-muted-foreground hover:text-foreground transition-colors text-left"
+                >
+                  Already have an account?{" "}
+                  <span className="font-semibold text-primary">Sign in</span>
+                </button>
+              )}
+            </div>
           </div>
 
-          <Button
-            variant="outline"
-            className="w-full"
-            onClick={() => void googleSignIn()}
-            disabled={busy}
-          >
-            Continue with Google
-          </Button>
-
-          <div className="mt-5 flex flex-col gap-2 text-[11.5px]">
-            <button
-              type="button"
-              className="w-fit text-muted-foreground transition-colors hover:text-foreground"
-              onClick={() => {
-                setMode(mode === "signin" ? "signup" : "signin");
-                setMessage(null);
-              }}
-            >
-              {mode === "signin"
-                ? "New here? Create an account"
-                : "Already have an account? Sign in"}
-            </button>
-            <button
-              type="button"
-              className="w-fit font-medium text-primary transition-colors hover:text-primary/75"
-              onClick={onPreview}
-            >
-              Preview the workspace
-            </button>
+          {/* Academic Demo Mode Button */}
+          <div className="mt-6 border-t border-border pt-4">
+            <div className="rounded-xl border border-border/80 bg-muted/30 p-3">
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-[11px] font-semibold text-foreground">
+                    Offline Evaluation Mode
+                  </p>
+                  <p className="text-[10px] text-muted-foreground">
+                    Explore workspace with local intelligence without cloud credentials
+                  </p>
+                </div>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={onEnterDemo}
+                  className="text-xs h-7 gap-1"
+                >
+                  <span>Explore Demo</span>
+                  <ArrowRight className="size-3" />
+                </Button>
+              </div>
+            </div>
           </div>
         </div>
       </section>
@@ -290,7 +536,7 @@ function BrandMark({ dark = false }: { dark?: boolean }) {
     <div className="flex items-center gap-2.5">
       <div
         className={cn(
-          "grid size-9 place-items-center rounded-xl text-[15px] font-bold",
+          "grid size-9 place-items-center rounded-xl text-[15px] font-bold shadow-sm",
           dark ? "bg-navy text-navy-foreground" : "bg-navy-foreground text-navy",
         )}
       >
@@ -305,8 +551,8 @@ function BrandMark({ dark = false }: { dark?: boolean }) {
         >
           MindSpace
         </p>
-        <p className={cn("text-[10.5px]", dark ? "text-muted-foreground" : "text-navy-muted")}>
-          Browser workspace
+        <p className={cn("text-[10px]", dark ? "text-muted-foreground" : "text-navy-muted")}>
+          AI Browser Workspace
         </p>
       </div>
     </div>
@@ -319,12 +565,22 @@ function BrandMark({ dark = false }: { dark?: boolean }) {
 
 export function Workspace({
   session,
-  onExitDemo,
+  isDemo = false,
+  onSignOut,
 }: {
   session: Session | null;
-  onExitDemo: () => void;
+  isDemo?: boolean;
+  onSignOut: () => void;
 }) {
-  const [view, setView] = useState<MindSpaceView>("overview");
+  const [view, setView] = useState<MindSpaceView>(() => {
+    if (typeof window !== "undefined") {
+      const params = new URLSearchParams(window.location.search);
+      const v = params.get("view");
+      if (v && v in VIEW_LABELS) return v as MindSpaceView;
+    }
+    return "overview";
+  });
+
   const [menuOpen, setMenuOpen] = useState(false);
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
   const [captureOpen, setCaptureOpen] = useState(false);
@@ -334,8 +590,13 @@ export function Workspace({
   const page = usePageContext();
   const savedPages = useSavedPages();
 
+  const userEmail =
+    session?.user?.email || (isDemo ? "demo@mindspace.local" : "user@mindspace.local");
   const rawName =
-    session?.user.user_metadata?.["full_name"] || session?.user.email?.split("@")[0] || "Explorer";
+    session?.user?.user_metadata?.["full_name"] ||
+    session?.user?.email?.split("@")[0] ||
+    (isDemo ? "Demo Evaluator" : "Explorer");
+
   const name = String(rawName);
   const initials =
     name
@@ -344,26 +605,38 @@ export function Workspace({
       .join("")
       .slice(0, 2)
       .toUpperCase() || "M";
+
   const user = {
     name,
-    email: session?.user.email ?? "Preview session",
+    email: userEmail,
     initials,
-    preview: !session,
+    preview: isDemo || !session,
   };
 
-  async function signOut() {
-    try {
-      if (session) await supabase.auth.signOut();
-      else onExitDemo();
-    } catch (e) {
-      console.warn("Sign out encountered network error, resetting locally:", e);
-      onExitDemo();
+  useEffect(() => {
+    function onPopState() {
+      if (typeof window !== "undefined") {
+        const params = new URLSearchParams(window.location.search);
+        const v = params.get("view");
+        if (v && v in VIEW_LABELS) {
+          setView(v as MindSpaceView);
+        } else {
+          setView("overview");
+        }
+      }
     }
-  }
+    window.addEventListener("popstate", onPopState);
+    return () => window.removeEventListener("popstate", onPopState);
+  }, []);
 
   function selectView(next: MindSpaceView) {
     setView(next);
     setMenuOpen(false);
+    if (typeof window !== "undefined") {
+      const url = new URL(window.location.href);
+      url.searchParams.set("view", next);
+      window.history.pushState({ view: next }, "", url.toString());
+    }
   }
 
   return (
@@ -393,7 +666,7 @@ export function Workspace({
           view={view}
           onSelect={selectView}
           user={user}
-          onSignOut={() => void signOut()}
+          onSignOut={onSignOut}
           onClose={() => setMenuOpen(false)}
           collapsed={sidebarCollapsed}
           onToggleCollapse={() => setSidebarCollapsed((c) => !c)}
@@ -411,25 +684,54 @@ export function Workspace({
             selectView("workspace");
             setCaptureOpen(true);
           }}
+          onSignOut={onSignOut}
+          userInitials={user.initials}
+          userName={user.name}
+          userEmail={user.email}
+          preview={user.preview}
         />
 
+        {isDemo && (
+          <div className="bg-amber-500/10 border-b border-amber-500/20 px-4 py-1.5 flex items-center justify-between text-xs text-amber-700 dark:text-amber-400">
+            <span className="flex items-center gap-1.5 font-medium">
+              <span className="size-2 rounded-full bg-amber-500 animate-pulse" />
+              Demo Mode Active — Running locally with offline simulated intelligence. No cloud
+              credentials required.
+            </span>
+            <button
+              type="button"
+              onClick={onSignOut}
+              className="text-[11px] underline hover:no-underline font-semibold"
+            >
+              Sign In to Real Account
+            </button>
+          </div>
+        )}
+
         <div className="flex min-h-0 flex-1">
-          <main className="scrollbar-slim min-w-0 flex-1 overflow-y-auto px-4 py-5 sm:px-6 sm:py-6">
-            {(view === "overview" || view === "home") && (
+          <main className="scrollbar-slim flex-1 overflow-y-auto p-4 sm:p-6 lg:p-8">
+            {view === "overview" && (
               <OverviewView
-                name={name}
+                onNavigate={selectView}
+                savedCount={savedPages.items.length}
+                hasContext={page.hasContent}
                 context={page.context}
-                onNavigate={(v) => selectView(v)}
-                onCapture={() => selectView("capture")}
               />
             )}
             {view === "capture" && (
-              <CurrentCaptureView context={page.context} onRunTask={() => selectView("agents")} />
+              <CurrentCaptureView
+                context={page.context}
+                hasContent={page.hasContent}
+                activeAction={page.activeAction}
+                onRunAction={page.runAction}
+                onClear={page.clear}
+                onSelectView={selectView}
+              />
             )}
             {view === "workspace" && (
               <MyWorkspaceView
                 context={page.context}
-                signedIn={Boolean(session)}
+                signedIn={Boolean(session) || isDemo}
                 savedItems={savedPages.items}
                 savedHydrated={savedPages.hydrated}
                 onRemoveSaved={savedPages.remove}
@@ -437,7 +739,9 @@ export function Workspace({
             )}
             {view === "approvals" && <ApprovalsView />}
             {view === "notifications" && <NotificationsView />}
-            {view === "accounts" && <ConnectedAccountsView signedIn={Boolean(session)} />}
+            {view === "accounts" && (
+              <ConnectedAccountsView signedIn={Boolean(session) || isDemo} userEmail={user.email} />
+            )}
             {view === "observability" && <ObservabilityView />}
             {(view === "collections" || view === "saved") && (
               <CollectionsView
@@ -448,28 +752,28 @@ export function Workspace({
             )}
             {view === "ask" && <AskMindSpaceView context={page.context} />}
             {(view === "research" || view === "knowledge") && (
-              <KnowledgeBase signedIn={Boolean(session)} />
+              <KnowledgeBase signedIn={Boolean(session) || isDemo} />
             )}
             {view === "writing" && (
               <WritingStudio seedText={page.context.selection || page.context.text} />
             )}
             {view === "agents" && (
-              <AgentActivity signedIn={Boolean(session)} context={page.context} />
+              <AgentActivity signedIn={Boolean(session) || isDemo} context={page.context} />
             )}
             {(view === "history" || view === "sessions") && (
-              <HistoryPanel signedIn={Boolean(session)} />
+              <HistoryPanel signedIn={Boolean(session) || isDemo} />
             )}
-            {view === "tasks" && <TasksPanel signedIn={Boolean(session)} />}
-            {view === "automations" && <AutomationsPanel signedIn={Boolean(session)} />}
+            {view === "tasks" && <TasksPanel signedIn={Boolean(session) || isDemo} />}
+            {view === "automations" && <AutomationsPanel signedIn={Boolean(session) || isDemo} />}
             {view === "settings" && (
               <SettingsView
                 showDetails={showDetails}
                 setShowDetails={setShowDetails}
                 quiet={quiet}
                 setQuiet={setQuiet}
-                onSignOut={() => void signOut()}
-                signedIn={Boolean(session)}
-                preview={!session}
+                onSignOut={onSignOut}
+                signedIn={Boolean(session) || isDemo}
+                preview={user.preview}
               />
             )}
           </main>
@@ -480,7 +784,7 @@ export function Workspace({
               wordCount={page.wordCount}
               hasContext={page.hasContent}
               savedCount={savedPages.items.length}
-              preview={!session}
+              preview={user.preview}
             />
           )}
         </div>
@@ -519,15 +823,15 @@ function DetailsRail({
           value={hasContext ? `${wordCount.toLocaleString()} words added` : "Not added yet"}
         />
         <RailRow label="Saved pages" value={`${savedCount} on this device`} />
-        <RailRow label="Account" value={preview ? "Preview mode" : "Signed in"} />
+        <RailRow label="Account" value={preview ? "Demo Evaluator" : "Authenticated User"} />
       </dl>
 
       <h2 className="mt-6 font-mono text-[9.5px] uppercase tracking-[0.16em] text-muted-foreground">
-        Boundaries
+        Security Controls
       </h2>
       <p className="mt-3 text-[11.5px] leading-5 text-muted-foreground">
-        MindSpace only sees the page text you add. It cannot browse, click or act on your behalf,
-        and this build has no screenshot capture.
+        Verified PyJWT token authentication and AES-256-GCM token encryption active. All external
+        mutating operations gated with human confirmation.
       </p>
     </aside>
   );
@@ -556,141 +860,100 @@ function SettingsView({
   preview,
 }: {
   showDetails: boolean;
-  setShowDetails: (value: boolean) => void;
+  setShowDetails: (value: boolean | ((current: boolean) => boolean)) => void;
   quiet: boolean;
-  setQuiet: (value: boolean) => void;
+  setQuiet: (value: boolean | ((current: boolean) => boolean)) => void;
   onSignOut: () => void;
   signedIn: boolean;
   preview: boolean;
 }) {
-  return (
-    <div className="mx-auto w-full max-w-3xl">
-      <ViewHeader
-        eyebrow="Settings"
-        title="Preferences"
-        description="How the workspace behaves, and what it is connected to."
-      />
-
-      <SurfaceCard className="mt-5 px-4 sm:px-5">
-        <ThemeSettingRow />
-        <SettingRow
-          label="Show page details"
-          copy="Keep a summary of this session beside your workspace on wide screens."
-          checked={showDetails}
-          onChange={setShowDetails}
-        />
-        <SettingRow
-          label="Reduce motion"
-          copy="Turn off the workspace's optional fade and pulse animations."
-          checked={quiet}
-          onChange={setQuiet}
-        />
-        <SettingRow
-          label="Launch on browser start"
-          copy="Available when the packaged Chrome extension is installed."
-          checked={false}
-          disabled
-          onChange={() => undefined}
-        />
-      </SurfaceCard>
-
-      <ConnectedServices signedIn={signedIn} />
-      <MemorySettings signedIn={signedIn} />
-
-      <SurfaceCard className="mt-4 flex items-center justify-between gap-4 p-4 sm:p-5">
-        <div>
-          <p className="text-sm font-medium text-foreground">
-            {preview ? "Preview session" : "Account session"}
-          </p>
-          <p className="mt-1 text-[11.5px] leading-5 text-muted-foreground">
-            {preview
-              ? "You are previewing the workspace without an account, so nothing is saved to a server."
-              : "Securely end this session on this browser."}
-          </p>
-        </div>
-        <Button variant="outline" size="sm" onClick={onSignOut}>
-          <LogOut aria-hidden="true" />
-          {preview ? "Exit preview" : "Sign out"}
-        </Button>
-      </SurfaceCard>
-    </div>
-  );
-}
-
-function ThemeSettingRow() {
   const { theme, setTheme } = useTheme();
+
   return (
-    <div className="flex flex-wrap items-center justify-between gap-4 border-b border-border py-4">
+    <div className="mx-auto max-w-2xl space-y-8">
       <div>
-        <p className="text-[13px] font-medium text-foreground">Theme & Appearance</p>
-        <p className="mt-1 text-[11.5px] leading-5 text-muted-foreground">
-          Persistent theme preference across refresh, extension reloads, and browser restarts.
+        <p className="font-mono text-[10.5px] uppercase tracking-[0.18em] text-primary">
+          Preferences
+        </p>
+        <h1 className="mt-2 text-[26px] font-semibold text-foreground">Settings</h1>
+        <p className="mt-2 text-[13px] text-muted-foreground">
+          Tune MindSpace to how you read and think.
         </p>
       </div>
-      <div className="inline-flex rounded-lg border border-border bg-muted/60 p-1">
-        {(["light", "dark", "system"] as const).map((t) => (
-          <button
-            key={t}
-            type="button"
-            onClick={() => setTheme(t)}
-            className={cn(
-              "flex items-center gap-1.5 rounded-md px-3 py-1 text-[12px] font-medium capitalize transition-colors",
-              theme === t
-                ? "bg-background text-foreground shadow-sm"
-                : "text-muted-foreground hover:text-foreground",
-            )}
-          >
-            {t === "light" && <Sun className="size-3.5" />}
-            {t === "dark" && <Moon className="size-3.5" />}
-            {t === "system" && <Laptop className="size-3.5" />}
-            {t}
-          </button>
-        ))}
+
+      <div className="space-y-6">
+        <section className="rounded-xl border border-border bg-card p-5">
+          <h2 className="text-[14px] font-semibold text-foreground">Theme</h2>
+          <p className="mt-1 text-[12px] text-muted-foreground">
+            Choose light, dark or mirror your operating system.
+          </p>
+          <div className="mt-4 grid grid-cols-3 gap-2">
+            {[
+              { id: "light" as const, label: "Light", icon: Sun },
+              { id: "dark" as const, label: "Dark", icon: Moon },
+              { id: "system" as const, label: "System", icon: Laptop },
+            ].map(({ id, label, icon: Icon }) => (
+              <button
+                key={id}
+                type="button"
+                onClick={() => setTheme(id)}
+                className={cn(
+                  "flex items-center justify-center gap-2 rounded-lg border px-3 py-2 text-[12px] font-medium transition-colors",
+                  theme === id
+                    ? "border-primary bg-primary/10 text-primary"
+                    : "border-border bg-background text-foreground hover:bg-muted",
+                )}
+              >
+                <Icon className="size-4" />
+                {label}
+              </button>
+            ))}
+          </div>
+        </section>
+
+        <section className="rounded-xl border border-border bg-card p-5">
+          <h2 className="text-[14px] font-semibold text-foreground">Workspace layout</h2>
+          <p className="mt-1 text-[12px] text-muted-foreground">
+            Adjust the panels visible on larger screens.
+          </p>
+          <label className="mt-4 flex items-center justify-between gap-4 text-[13px]">
+            <span>Show session details rail</span>
+            <input
+              type="checkbox"
+              checked={showDetails}
+              onChange={(e) => setShowDetails(e.target.checked)}
+              className="size-4 rounded border-border text-primary focus:ring-primary"
+            />
+          </label>
+          <label className="mt-3 flex items-center justify-between gap-4 text-[13px]">
+            <span>Quiet mode (hide side navigation labels)</span>
+            <input
+              type="checkbox"
+              checked={quiet}
+              onChange={(e) => setQuiet(e.target.checked)}
+              className="size-4 rounded border-border text-primary focus:ring-primary"
+            />
+          </label>
+        </section>
+
+        <section className="rounded-xl border border-border bg-card p-5">
+          <h2 className="text-[14px] font-semibold text-foreground">Account & Session</h2>
+          <p className="mt-1 text-[12px] text-muted-foreground">
+            {preview
+              ? "Currently running in local evaluation mode."
+              : "Manage your active authenticated session."}
+          </p>
+          <div className="mt-4 flex items-center justify-between">
+            <span className="text-xs text-muted-foreground">
+              {preview ? "Evaluation Session" : "Signed in"}
+            </span>
+            <Button variant="outline" size="sm" onClick={onSignOut} className="gap-1.5 text-xs">
+              <LogOut className="size-3.5" />
+              Sign Out
+            </Button>
+          </div>
+        </section>
       </div>
     </div>
   );
 }
-
-function SettingRow({
-  label,
-  copy,
-  checked,
-  onChange,
-  disabled = false,
-}: {
-  label: string;
-  copy: string;
-  checked: boolean;
-  onChange: (value: boolean) => void;
-  disabled?: boolean;
-}) {
-  return (
-    <div className="flex items-center justify-between gap-5 border-b border-border py-4 last:border-b-0">
-      <div>
-        <p className="text-[13px] font-medium text-foreground">{label}</p>
-        <p className="mt-1 text-[11.5px] leading-5 text-muted-foreground">{copy}</p>
-      </div>
-      <button
-        type="button"
-        role="switch"
-        aria-checked={checked}
-        aria-label={label}
-        disabled={disabled}
-        onClick={() => onChange(!checked)}
-        className={cn(
-          "relative h-6 w-10 shrink-0 rounded-full transition-colors disabled:opacity-40",
-          checked ? "bg-primary" : "bg-foreground/15",
-        )}
-      >
-        <span
-          className={cn(
-            "absolute top-1 size-4 rounded-full bg-primary-foreground shadow-sm transition-transform",
-            checked ? "translate-x-5" : "translate-x-1",
-          )}
-        />
-      </button>
-    </div>
-  );
-}
-
-/* -------------------------------------------------------------------------- */

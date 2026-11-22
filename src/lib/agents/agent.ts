@@ -9,8 +9,8 @@
  */
 import type { RunTracer } from "./tracer";
 import { ToolError, type ToolContext, type ToolRegistry } from "./tools";
-import type { GoogleServices } from "@/lib/google/adapter.server";
-import type { TaskService } from "@/lib/reminders/types";
+import type { GoogleServices } from "../google/adapter.server";
+import type { TaskService } from "../reminders/types";
 import {
   AgentMessageEnvelope,
   makeId,

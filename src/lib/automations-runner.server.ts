@@ -73,19 +73,38 @@ export async function runAutomation(automation: AutomationRow): Promise<{ status
     dayOfWeek: automation.schedule_day_of_week,
   };
   const nextRunAt = computeNextRun(schedule);
+  const now = new Date().toISOString();
 
-  await supabaseAdmin
-    .from("automations")
-    .update({ last_run_at: new Date().toISOString(), next_run_at: nextRunAt.toISOString() })
-    .eq("id", automation.id);
+  let recordedInSupabase = false;
+  try {
+    const { error: updateError } = await supabaseAdmin
+      .from("automations")
+      .update({ last_run_at: now, next_run_at: nextRunAt.toISOString() })
+      .eq("id", automation.id);
 
-  await supabaseAdmin.from("automation_runs").insert({
-    automation_id: automation.id,
-    user_id: automation.user_id,
-    agent_run_id: result?.runId ?? null,
-    status: runStatus,
-    summary,
-  });
+    const { error: insertError } = await supabaseAdmin.from("automation_runs").insert({
+      automation_id: automation.id,
+      user_id: automation.user_id,
+      agent_run_id: result?.runId ?? null,
+      status: runStatus,
+      summary,
+    });
+    if (!updateError && !insertError) recordedInSupabase = true;
+  } catch {
+    // Supabase unavailable; fall through to local SQLite
+  }
+
+  if (!recordedInSupabase) {
+    const { recordLocalAutomationRun } = await import("@/lib/local-db.server");
+    recordLocalAutomationRun({
+      automationId: automation.id,
+      userId: automation.user_id,
+      agentRunId: result?.runId ?? null,
+      status: runStatus,
+      summary,
+      ranAt: now,
+    });
+  }
 
   return { status: runStatus };
 }

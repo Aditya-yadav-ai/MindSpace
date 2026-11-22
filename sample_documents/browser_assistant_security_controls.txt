@@ -22,3 +22,4 @@ The Model Context Protocol (MCP) Research Agent performs real-time web lookups. 
 - Composite compound keys `(tenant_id, user_id)` ensure strict database isolation.
 - OAuth refresh tokens are encrypted at rest using AES-256-GCM with authenticated verification tags.
 - Ingestion endpoints enforce a 25 MB payload threshold, sliding-window rate limiters, and complete GDPR data purging.
+

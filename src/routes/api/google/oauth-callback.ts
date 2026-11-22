@@ -8,8 +8,8 @@
 import { createFileRoute } from "@tanstack/react-router";
 
 function redirectToApp(status: "connected" | "error", detail?: string) {
-  const params = new URLSearchParams({ google: status });
-  if (detail) params.set("detail", detail.slice(0, 200));
+  const params = new URLSearchParams({ view: "accounts", google: status });
+  if (detail) params.set("detail", detail.slice(0, 300));
   return new Response(null, { status: 302, headers: { Location: `/?${params.toString()}` } });
 }
 

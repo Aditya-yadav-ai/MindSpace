@@ -1,0 +1,277 @@
+{
+  "oauth_url": null,
+  "pkce_validation": "PASS (SHA-256 S256 RFC 7636 compliant)",
+  "email_verification": null,
+  "same_email_linking": "PASS (Strictly enforced)",
+  "crypto_encryption": "PASS (AES-256-GCM with PBKDF2/SHA-512)",
+  "crypto_tamper_detection": null,
+  "token_refresh_contract": null,
+  "not_connected_safety_gate": "PASS (14/14 blocked safely)",
+  "endpoint_connectivity": {
+    "oauth_auth": {
+      "name": "Google OAuth Authorization",
+      "status_code": 200,
+      "status_text": "OK",
+      "latency_ms": 1982,
+      "reachable": true
+    },
+    "oauth_token": {
+      "name": "Google OAuth Token",
+      "status_code": 400,
+      "status_text": "Bad Request",
+      "latency_ms": 857,
+      "reachable": true
+    },
+    "oauth_userinfo": {
+      "name": "Google OpenID UserInfo",
+      "status_code": 401,
+      "status_text": "Unauthorized",
+      "latency_ms": 585,
+      "reachable": true
+    },
+    "gmail": {
+      "name": "1. Gmail API",
+      "status_code": 401,
+      "status_text": "Unauthorized",
+      "latency_ms": 909,
+      "reachable": true
+    },
+    "calendar": {
+      "name": "2. Google Calendar API",
+      "status_code": 403,
+      "status_text": "Forbidden",
+      "latency_ms": 655,
+      "reachable": true
+    },
+    "drive": {
+      "name": "3. Google Drive API",
+      "status_code": 403,
+      "status_text": "Forbidden",
+      "latency_ms": 721,
+      "reachable": true
+    },
+    "docs": {
+      "name": "4. Google Docs API",
+      "status_code": 401,
+      "status_text": "Unauthorized",
+      "latency_ms": 867,
+      "reachable": true
+    },
+    "sheets": {
+      "name": "5. Google Sheets API",
+      "status_code": 403,
+      "status_text": "Forbidden",
+      "latency_ms": 842,
+      "reachable": true
+    },
+    "slides": {
+      "name": "6. Google Slides API",
+      "status_code": 401,
+      "status_text": "Unauthorized",
+      "latency_ms": 1873,
+      "reachable": true
+    },
+    "meet": {
+      "name": "7. Google Meet API",
+      "status_code": 404,
+      "status_text": "Not Found",
+      "latency_ms": 842,
+      "reachable": false
+    },
+    "forms": {
+      "name": "8. Google Forms API",
+      "status_code": 401,
+      "status_text": "Unauthorized",
+      "latency_ms": 1226,
+      "reachable": true
+    },
+    "tasks": {
+      "name": "9. Google Tasks API",
+      "status_code": 401,
+      "status_text": "Unauthorized",
+      "latency_ms": 930,
+      "reachable": true
+    },
+    "contacts": {
+      "name": "10. People API (Contacts)",
+      "status_code": 401,
+      "status_text": "Unauthorized",
+      "latency_ms": 799,
+      "reachable": true
+    },
+    "chat": {
+      "name": "11. Google Chat API",
+      "status_code": 401,
+      "status_text": "Unauthorized",
+      "latency_ms": 863,
+      "reachable": true
+    },
+    "maps": {
+      "name": "12. Google Maps Platform",
+      "status_code": 200,
+      "status_text": "OK",
+      "latency_ms": 1180,
+      "reachable": true
+    },
+    "classroom": {
+      "name": "13. Google Classroom API",
+      "status_code": 401,
+      "status_text": "Unauthorized",
+      "latency_ms": 945,
+      "reachable": true
+    },
+    "youtube": {
+      "name": "14. YouTube Data API v3",
+      "status_code": 403,
+      "status_text": "Forbidden",
+      "latency_ms": 512,
+      "reachable": true
+    }
+  },
+  "services": {
+    "gmail": {
+      "label": "Gmail",
+      "category": "communication",
+      "endpoint_reachable": true,
+      "latency_ms": 909,
+      "scopes": ["gmail.readonly", "gmail.compose"],
+      "operations_count": 4,
+      "live_status": "BLOCKED_OAUTH_CONFIG",
+      "details": "Requires active GOOGLE_CLIENT_ID and GOOGLE_CLIENT_SECRET in .env"
+    },
+    "meet": {
+      "label": "Google Meet",
+      "category": "communication",
+      "endpoint_reachable": false,
+      "latency_ms": 842,
+      "scopes": ["meetings.space.created", "meetings.space.readonly"],
+      "operations_count": 5,
+      "live_status": "BLOCKED_OAUTH_CONFIG",
+      "details": "Requires active GOOGLE_CLIENT_ID and GOOGLE_CLIENT_SECRET in .env"
+    },
+    "chat": {
+      "label": "Google Chat",
+      "category": "communication",
+      "endpoint_reachable": true,
+      "latency_ms": 863,
+      "scopes": ["chat.spaces.readonly", "chat.messages", "chat.memberships.readonly"],
+      "operations_count": 6,
+      "live_status": "BLOCKED_OAUTH_CONFIG",
+      "details": "Requires active GOOGLE_CLIENT_ID and GOOGLE_CLIENT_SECRET in .env"
+    },
+    "drive": {
+      "label": "Google Drive",
+      "category": "productivity",
+      "endpoint_reachable": true,
+      "latency_ms": 721,
+      "scopes": ["drive.file"],
+      "operations_count": 3,
+      "live_status": "BLOCKED_OAUTH_CONFIG",
+      "details": "Requires active GOOGLE_CLIENT_ID and GOOGLE_CLIENT_SECRET in .env"
+    },
+    "docs": {
+      "label": "Google Docs",
+      "category": "productivity",
+      "endpoint_reachable": true,
+      "latency_ms": 867,
+      "scopes": ["documents"],
+      "operations_count": 3,
+      "live_status": "BLOCKED_OAUTH_CONFIG",
+      "details": "Requires active GOOGLE_CLIENT_ID and GOOGLE_CLIENT_SECRET in .env"
+    },
+    "sheets": {
+      "label": "Google Sheets",
+      "category": "productivity",
+      "endpoint_reachable": true,
+      "latency_ms": 842,
+      "scopes": ["spreadsheets"],
+      "operations_count": 3,
+      "live_status": "BLOCKED_OAUTH_CONFIG",
+      "details": "Requires active GOOGLE_CLIENT_ID and GOOGLE_CLIENT_SECRET in .env"
+    },
+    "slides": {
+      "label": "Google Slides",
+      "category": "productivity",
+      "endpoint_reachable": true,
+      "latency_ms": 1873,
+      "scopes": ["presentations"],
+      "operations_count": 3,
+      "live_status": "BLOCKED_OAUTH_CONFIG",
+      "details": "Requires active GOOGLE_CLIENT_ID and GOOGLE_CLIENT_SECRET in .env"
+    },
+    "tasks": {
+      "label": "Google Tasks",
+      "category": "productivity",
+      "endpoint_reachable": true,
+      "latency_ms": 930,
+      "scopes": ["tasks"],
+      "operations_count": 7,
+      "live_status": "BLOCKED_OAUTH_CONFIG",
+      "details": "Requires active GOOGLE_CLIENT_ID and GOOGLE_CLIENT_SECRET in .env"
+    },
+    "calendar": {
+      "label": "Google Calendar",
+      "category": "productivity",
+      "endpoint_reachable": true,
+      "latency_ms": 655,
+      "scopes": ["calendar.events"],
+      "operations_count": 3,
+      "live_status": "BLOCKED_OAUTH_CONFIG",
+      "details": "Requires active GOOGLE_CLIENT_ID and GOOGLE_CLIENT_SECRET in .env"
+    },
+    "contacts": {
+      "label": "Google Contacts",
+      "category": "productivity",
+      "endpoint_reachable": true,
+      "latency_ms": 799,
+      "scopes": ["contacts", "contacts.readonly"],
+      "operations_count": 6,
+      "live_status": "BLOCKED_OAUTH_CONFIG",
+      "details": "Requires active GOOGLE_CLIENT_ID and GOOGLE_CLIENT_SECRET in .env"
+    },
+    "classroom": {
+      "label": "Google Classroom",
+      "category": "education",
+      "endpoint_reachable": true,
+      "latency_ms": 945,
+      "scopes": [
+        "classroom.courses.readonly",
+        "classroom.coursework.me",
+        "classroom.announcements"
+      ],
+      "operations_count": 7,
+      "live_status": "BLOCKED_OAUTH_CONFIG",
+      "details": "Requires active GOOGLE_CLIENT_ID and GOOGLE_CLIENT_SECRET in .env"
+    },
+    "forms": {
+      "label": "Google Forms",
+      "category": "education",
+      "endpoint_reachable": true,
+      "latency_ms": 1226,
+      "scopes": ["forms.body", "forms.responses.readonly"],
+      "operations_count": 4,
+      "live_status": "BLOCKED_OAUTH_CONFIG",
+      "details": "Requires active GOOGLE_CLIENT_ID and GOOGLE_CLIENT_SECRET in .env"
+    },
+    "youtube": {
+      "label": "YouTube",
+      "category": "education",
+      "endpoint_reachable": true,
+      "latency_ms": 512,
+      "scopes": ["youtube.readonly", "youtube"],
+      "operations_count": 5,
+      "live_status": "BLOCKED_OAUTH_CONFIG",
+      "details": "Requires active GOOGLE_CLIENT_ID and GOOGLE_CLIENT_SECRET in .env"
+    },
+    "maps": {
+      "label": "Google Maps",
+      "category": "location",
+      "endpoint_reachable": true,
+      "latency_ms": 1180,
+      "scopes": ["maps.places", "maps.geocoding"],
+      "operations_count": 6,
+      "live_status": "BLOCKED_CONFIG",
+      "details": "Requires GOOGLE_MAPS_API_KEY in backend environment"
+    }
+  }
+}

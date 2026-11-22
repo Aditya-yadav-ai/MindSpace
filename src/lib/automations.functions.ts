@@ -60,14 +60,19 @@ const CreateAutomationInput = ScheduleInput.extend({
 export const listAutomations = createServerFn({ method: "GET" })
   .middleware([requireSupabaseAuth])
   .handler(async ({ context }): Promise<AutomationRecord[]> => {
-    const { data, error } = await context.supabase
-      .from("automations")
-      .select(
-        "id,name,goal,schedule_kind,schedule_hour,schedule_day_of_week,approved_tools,enabled,last_run_at,next_run_at,created_at",
-      )
-      .order("created_at", { ascending: false });
-    if (error) throw new Error(error.message);
-    return (data ?? []) as AutomationRecord[];
+    try {
+      const { data, error } = await context.supabase
+        .from("automations")
+        .select(
+          "id,name,goal,schedule_kind,schedule_hour,schedule_day_of_week,approved_tools,enabled,last_run_at,next_run_at,created_at",
+        )
+        .order("created_at", { ascending: false });
+      if (!error && data) return data as AutomationRecord[];
+    } catch {
+      // Supabase unavailable; fall through to local SQLite
+    }
+    const { getLocalAutomations } = await import("@/lib/local-db.server");
+    return getLocalAutomations(context.userId);
   });
 
 export const createAutomation = createServerFn({ method: "POST" })
@@ -79,24 +84,37 @@ export const createAutomation = createServerFn({ method: "POST" })
       hour: data.scheduleHour,
       dayOfWeek: data.scheduleDayOfWeek,
     });
-    const { data: inserted, error } = await context.supabase
-      .from("automations")
-      .insert({
-        user_id: context.userId,
-        name: data.name,
-        goal: data.goal,
-        schedule_kind: data.scheduleKind,
-        schedule_hour: data.scheduleHour,
-        schedule_day_of_week: data.scheduleDayOfWeek,
-        approved_tools: data.approvedTools,
-        next_run_at: nextRunAt.toISOString(),
-      })
-      .select(
-        "id,name,goal,schedule_kind,schedule_hour,schedule_day_of_week,approved_tools,enabled,last_run_at,next_run_at,created_at",
-      )
-      .single();
-    if (error || !inserted) throw new Error(error?.message ?? "Could not create this automation.");
-    return inserted as AutomationRecord;
+    try {
+      const { data: inserted, error } = await context.supabase
+        .from("automations")
+        .insert({
+          user_id: context.userId,
+          name: data.name,
+          goal: data.goal,
+          schedule_kind: data.scheduleKind,
+          schedule_hour: data.scheduleHour,
+          schedule_day_of_week: data.scheduleDayOfWeek,
+          approved_tools: data.approvedTools,
+          next_run_at: nextRunAt.toISOString(),
+        })
+        .select(
+          "id,name,goal,schedule_kind,schedule_hour,schedule_day_of_week,approved_tools,enabled,last_run_at,next_run_at,created_at",
+        )
+        .single();
+      if (!error && inserted) return inserted as AutomationRecord;
+    } catch {
+      // Supabase unavailable; fall through to local SQLite
+    }
+    const { createLocalAutomation } = await import("@/lib/local-db.server");
+    return createLocalAutomation(context.userId, {
+      name: data.name,
+      goal: data.goal,
+      scheduleKind: data.scheduleKind,
+      scheduleHour: data.scheduleHour,
+      scheduleDayOfWeek: data.scheduleDayOfWeek,
+      approvedTools: data.approvedTools,
+      nextRunAt: nextRunAt.toISOString(),
+    });
   });
 
 const UpdateAutomationInput = z.object({
@@ -116,11 +134,18 @@ export const updateAutomation = createServerFn({ method: "POST" })
     if (rest.name !== undefined) patch.name = rest.name;
     if (rest.goal !== undefined) patch.goal = rest.goal;
     if (Object.keys(patch).length === 0) return { ok: true };
-    const { error } = await context.supabase
-      .from("automations")
-      .update(patch)
-      .eq("id", automationId);
-    if (error) throw new Error(error.message);
+
+    try {
+      const { error } = await context.supabase
+        .from("automations")
+        .update(patch)
+        .eq("id", automationId);
+      if (!error) return { ok: true };
+    } catch {
+      // Supabase unavailable; fall through to local SQLite
+    }
+    const { updateLocalAutomation } = await import("@/lib/local-db.server");
+    updateLocalAutomation(automationId, patch);
     return { ok: true };
   });
 
@@ -128,11 +153,17 @@ export const deleteAutomation = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .inputValidator((input: unknown) => z.object({ automationId: z.string().uuid() }).parse(input))
   .handler(async ({ data, context }): Promise<{ ok: true }> => {
-    const { error } = await context.supabase
-      .from("automations")
-      .delete()
-      .eq("id", data.automationId);
-    if (error) throw new Error(error.message);
+    try {
+      const { error } = await context.supabase
+        .from("automations")
+        .delete()
+        .eq("id", data.automationId);
+      if (!error) return { ok: true };
+    } catch {
+      // Supabase unavailable; fall through to local SQLite
+    }
+    const { deleteLocalAutomation } = await import("@/lib/local-db.server");
+    deleteLocalAutomation(data.automationId);
     return { ok: true };
   });
 
@@ -140,29 +171,69 @@ export const listAutomationRuns = createServerFn({ method: "GET" })
   .middleware([requireSupabaseAuth])
   .inputValidator((input: unknown) => z.object({ automationId: z.string().uuid() }).parse(input))
   .handler(async ({ data, context }): Promise<AutomationRunRecord[]> => {
-    const { data: rows, error } = await context.supabase
-      .from("automation_runs")
-      .select("id,agent_run_id,status,summary,ran_at")
-      .eq("automation_id", data.automationId)
-      .order("ran_at", { ascending: false })
-      .limit(20);
-    if (error) throw new Error(error.message);
-    return (rows ?? []) as AutomationRunRecord[];
+    try {
+      const { data: rows, error } = await context.supabase
+        .from("automation_runs")
+        .select("id,agent_run_id,status,summary,ran_at")
+        .eq("automation_id", data.automationId)
+        .order("ran_at", { ascending: false })
+        .limit(20);
+      if (!error && rows) return rows as AutomationRunRecord[];
+    } catch {
+      // Supabase unavailable; fall through to local SQLite
+    }
+    const { getLocalAutomationRuns } = await import("@/lib/local-db.server");
+    return getLocalAutomationRuns(data.automationId);
   });
 
 export const runAutomationNow = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .inputValidator((input: unknown) => z.object({ automationId: z.string().uuid() }).parse(input))
   .handler(async ({ data, context }): Promise<{ status: string }> => {
-    const { data: automation, error } = await context.supabase
-      .from("automations")
-      .select(
-        "id,user_id,name,goal,schedule_kind,schedule_hour,schedule_day_of_week,approved_tools,enabled",
-      )
-      .eq("id", data.automationId)
-      .single();
-    if (error || !automation) throw new Error(error?.message ?? "Automation not found.");
+    let row: {
+      id: string;
+      user_id: string;
+      name: string;
+      goal: string;
+      schedule_kind: string;
+      schedule_hour: number;
+      schedule_day_of_week: number | null;
+      approved_tools: string[];
+      enabled: boolean;
+    } | null = null;
+    try {
+      const { data: automation, error } = await context.supabase
+        .from("automations")
+        .select(
+          "id,user_id,name,goal,schedule_kind,schedule_hour,schedule_day_of_week,approved_tools,enabled",
+        )
+        .eq("id", data.automationId)
+        .single();
+      if (!error && automation) row = automation;
+    } catch {
+      // Supabase unavailable; fall through to local SQLite
+    }
+
+    if (!row) {
+      const { getLocalAutomation } = await import("@/lib/local-db.server");
+      const local = getLocalAutomation(data.automationId);
+      if (local) {
+        row = {
+          id: local.id,
+          user_id: context.userId,
+          name: local.name,
+          goal: local.goal,
+          schedule_kind: local.schedule_kind,
+          schedule_hour: local.schedule_hour,
+          schedule_day_of_week: local.schedule_day_of_week,
+          approved_tools: local.approved_tools,
+          enabled: local.enabled,
+        };
+      }
+    }
+
+    if (!row) throw new Error("Automation not found.");
 
     const { runAutomation, toAutomationRow } = await import("@/lib/automations-runner.server");
-    return runAutomation(toAutomationRow(automation));
+    return runAutomation(toAutomationRow(row));
   });

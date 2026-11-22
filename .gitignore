@@ -76,6 +76,12 @@ apps/api/.env
 *.db
 *.sqlite
 *.sqlite3
+*.db-wal
+*.db-shm
+*.db-journal
 apps/api/mas/outputs/*.db
+apps/api/mas/outputs/*.db-wal
+apps/api/mas/outputs/*.db-shm
 apps/api/mas/outputs/*.sqlite
+
 

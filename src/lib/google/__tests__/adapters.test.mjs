@@ -1,5 +1,6 @@
 /**
- * Comprehensive verification of MindSpace Google Workspace service adapters and OAuth encryption.
+ * Comprehensive verification of MindSpace Google 14 Services integrations,
+ * adapters, OAuth encryption, and agent planning.
  * Run directly with: npx jiti src/lib/google/__tests__/adapters.test.mjs
  */
 import test from "node:test";
@@ -9,9 +10,11 @@ import { GOOGLE_SERVICE_CAPABILITIES } from "../capabilities.ts";
 import { notConnectedGoogleServices } from "../not-connected.ts";
 import { GoogleNotConnectedError } from "../types.ts";
 import { encryptToken, decryptToken, TokenEncryptionError } from "../crypto.server.ts";
+import { planGoal } from "../../agents/planner.ts";
+import { buildMindSpaceAgents } from "../../agents/manager.ts";
 
-test("Google Service Capabilities Contract", async (t) => {
-  await t.test("all 10 official Google services are registered", () => {
+test("Google Service Capabilities Contract (14 Services)", async (t) => {
+  await t.test("all 14 official Google services are registered", () => {
     const expected = [
       "gmail",
       "calendar",
@@ -19,10 +22,14 @@ test("Google Service Capabilities Contract", async (t) => {
       "docs",
       "sheets",
       "slides",
-      "forms",
       "meet",
-      "classroom",
+      "forms",
+      "tasks",
+      "contacts",
       "chat",
+      "maps",
+      "classroom",
+      "youtube",
     ];
     const registeredIds = GOOGLE_SERVICE_CAPABILITIES.map((s) => s.id);
     for (const serviceId of expected) {
@@ -31,26 +38,41 @@ test("Google Service Capabilities Contract", async (t) => {
         `Expected service ${serviceId} to be registered in GOOGLE_SERVICE_CAPABILITIES`,
       );
     }
-    assert.equal(GOOGLE_SERVICE_CAPABILITIES.length, 10);
+    assert.equal(GOOGLE_SERVICE_CAPABILITIES.length, 14);
   });
 
-  await t.test("each service declares valid read/write flags and scopes", () => {
-    for (const service of GOOGLE_SERVICE_CAPABILITIES) {
-      assert.ok(typeof service.label === "string" && service.label.length > 0);
-      assert.ok(typeof service.reads === "boolean");
-      assert.ok(typeof service.writes === "boolean");
-      assert.ok(Array.isArray(service.scopes) && service.scopes.length > 0);
-    }
+  await t.test(
+    "each service declares valid category, read/write flags, scopes, and operations",
+    () => {
+      const validCategories = new Set(["communication", "productivity", "education", "location"]);
+      for (const service of GOOGLE_SERVICE_CAPABILITIES) {
+        assert.ok(typeof service.label === "string" && service.label.length > 0);
+        assert.ok(validCategories.has(service.category), `Invalid category: ${service.category}`);
+        assert.ok(typeof service.reads === "boolean");
+        assert.ok(typeof service.writes === "boolean");
+        assert.ok(Array.isArray(service.scopes));
+        assert.ok(Array.isArray(service.operations) && service.operations.length > 0);
+      }
+    },
+  );
+
+  await t.test("explicitly excludes Google Keep and Google Photos", () => {
+    const registeredIds = GOOGLE_SERVICE_CAPABILITIES.map((s) => s.id.toLowerCase());
+    assert.equal(registeredIds.includes("keep"), false);
+    assert.equal(registeredIds.includes("photos"), false);
+    assert.equal(registeredIds.includes("google_keep"), false);
+    assert.equal(registeredIds.includes("google_photos"), false);
   });
 });
 
-test("Default NotConnected Adapter Safety Gate", async (t) => {
+test("Default NotConnected Adapter Safety Gate (All 14 Services)", async (t) => {
   await t.test("is marked as connected=false", () => {
     assert.equal(notConnectedGoogleServices.connected, false);
   });
 
   await t.test("all operations reject with GoogleNotConnectedError", async () => {
     const operations = [
+      // 1. Gmail
       () => notConnectedGoogleServices.listRecentEmails({ query: "", limit: 5 }),
       () =>
         notConnectedGoogleServices.createEmailDraft({
@@ -58,17 +80,28 @@ test("Default NotConnected Adapter Safety Gate", async (t) => {
           subject: "hi",
           body: "test",
         }),
+      // 2. Calendar
       () => notConnectedGoogleServices.listUpcomingEvents({ maxResults: 5 }),
       () =>
         notConnectedGoogleServices.createCalendarEvent({
           summary: "sync",
-          startIso: "2026-11-20T10:00:00Z",
-          endIso: "2026-11-20T11:00:00Z",
+          description: "notes",
+          location: "office",
+          start: "2026-11-20T10:00:00Z",
+          end: "2026-11-20T11:00:00Z",
         }),
+      // 3. Drive
       () => notConnectedGoogleServices.searchDriveFiles({ query: "doc", limit: 5 }),
-      () => notConnectedGoogleServices.saveDriveFile({ name: "notes.txt", content: "test" }),
+      () =>
+        notConnectedGoogleServices.saveDriveFile({
+          name: "notes.txt",
+          content: "test",
+          mimeType: "text/plain",
+        }),
+      // 4. Docs
       () => notConnectedGoogleServices.readDocument("doc-123"),
-      () => notConnectedGoogleServices.createDocument({ title: "New Doc" }),
+      () => notConnectedGoogleServices.createDocument({ title: "New Doc", body: "Hello" }),
+      // 5. Sheets
       () => notConnectedGoogleServices.readSheetRange("sheet-123", "A1:B10"),
       () => notConnectedGoogleServices.createSpreadsheet({ title: "Budget" }),
       () =>
@@ -77,15 +110,50 @@ test("Default NotConnected Adapter Safety Gate", async (t) => {
           range: "A1",
           values: [["val"]],
         }),
+      // 6. Slides
       () => notConnectedGoogleServices.readPresentation("slide-123"),
       () => notConnectedGoogleServices.createPresentation({ title: "Deck" }),
-      () => notConnectedGoogleServices.createForm({ title: "Survey" }),
-      () => notConnectedGoogleServices.listFormResponses("form-123", 5),
+      // 7. Meet
       () => notConnectedGoogleServices.createMeetingSpace(),
+      () => notConnectedGoogleServices.getMeetingSpace("spaces/123"),
+      () => notConnectedGoogleServices.listConferenceRecords(5),
+      () => notConnectedGoogleServices.listConferenceParticipants("rec-123", 5),
+      // 8. Forms
+      () => notConnectedGoogleServices.createForm({ title: "Survey", description: "Feedback" }),
+      () => notConnectedGoogleServices.getForm("form-123"),
+      () => notConnectedGoogleServices.getFormQuestions("form-123"),
+      () => notConnectedGoogleServices.listFormResponses("form-123", 5),
+      // 9. Tasks
+      () => notConnectedGoogleServices.listTasks("@default", true, 5),
+      () =>
+        notConnectedGoogleServices.createTask({ title: "Finish paper", taskListId: "@default" }),
+      () => notConnectedGoogleServices.completeTask("@default", "task-1"),
+      () => notConnectedGoogleServices.deleteTask("@default", "task-1"),
+      // 10. Contacts
+      () => notConnectedGoogleServices.listContacts(5),
+      () => notConnectedGoogleServices.searchContacts("Smith", 5),
+      () =>
+        notConnectedGoogleServices.createContact({
+          givenName: "Alice",
+          email: "alice@example.com",
+        }),
+      () => notConnectedGoogleServices.deleteContact("people/c123"),
+      // 11. Chat
+      () => notConnectedGoogleServices.listChatSpaces(5),
+      () => notConnectedGoogleServices.getChatSpace("spaces/abc"),
+      () => notConnectedGoogleServices.sendChatMessage({ space: "spaces/abc", text: "Hello team" }),
+      // 12. Maps
+      () => notConnectedGoogleServices.searchPlaces("cafe"),
+      () => notConnectedGoogleServices.getPlaceDetails("place-123"),
+      () => notConnectedGoogleServices.getDirections("A", "B"),
+      // 13. Classroom
       () => notConnectedGoogleServices.listClassroomCourses(5),
       () => notConnectedGoogleServices.listClassroomCourseWork("c-123", 5),
-      () => notConnectedGoogleServices.listChatSpaces(5),
-      () => notConnectedGoogleServices.sendChatMessage({ spaceId: "spaces/123", text: "Hello" }),
+      () => notConnectedGoogleServices.listClassroomAnnouncements("c-123", 5),
+      // 14. YouTube
+      () => notConnectedGoogleServices.searchYouTubeVideos("ML lecture", 5),
+      () => notConnectedGoogleServices.getYouTubeVideoDetails("vid-123"),
+      () => notConnectedGoogleServices.listYouTubePlaylists("mine", 5),
     ];
 
     for (const fn of operations) {
@@ -131,9 +199,10 @@ test("AES-256-GCM Token Encryption Security", async (t) => {
   });
 });
 
-test("Google Adapter REST API Endpoints Verification", async (t) => {
+test("Google Adapter REST API Endpoints Verification (All 14 Services)", async (t) => {
   const calls = [];
   const mockAccessToken = "mock-valid-bearer-token";
+  process.env.GOOGLE_MAPS_API_KEY = "mock-maps-key-12345";
 
   // Mock global fetch
   const originalFetch = globalThis.fetch;
@@ -145,6 +214,8 @@ test("Google Adapter REST API Endpoints Verification", async (t) => {
       async json() {
         return {
           id: "res_123",
+          place_id: "place_123",
+          status: "OK",
           message: { id: "msg_123" },
           documentId: "doc_123",
           spreadsheetId: "sheet_123",
@@ -157,6 +228,10 @@ test("Google Adapter REST API Endpoints Verification", async (t) => {
           courses: [],
           courseWork: [],
           spaces: [],
+          results: [],
+          connections: [],
+          routes: [],
+          rows: [],
         };
       },
       async text() {
@@ -176,12 +251,18 @@ test("Google Adapter REST API Endpoints Verification", async (t) => {
     const meet = await import("../meet.server.ts");
     const classroom = await import("../classroom.server.ts");
     const chat = await import("../chat.server.ts");
+    const tasks = await import("../tasks.server.ts");
+    const contacts = await import("../contacts.server.ts");
+    const maps = await import("../maps.server.ts");
+    const youtube = await import("../youtube.server.ts");
 
     // 1. Calendar
     await calendar.createEvent(mockAccessToken, {
       summary: "Sync Meeting",
-      startIso: "2026-11-10T10:00:00Z",
-      endIso: "2026-11-10T11:00:00Z",
+      description: "Discuss roadmap",
+      location: "Room A",
+      start: "2026-11-10T10:00:00Z",
+      end: "2026-11-10T11:00:00Z",
     });
     const calCall = calls.pop();
     assert.ok(calCall.url.includes("googleapis.com/calendar/v3/calendars/primary/events"));
@@ -239,18 +320,76 @@ test("Google Adapter REST API Endpoints Verification", async (t) => {
     assert.ok(meetCall.url.includes("meet.googleapis.com/v2/spaces"));
     assert.equal(meetCall.init.headers.Authorization, `Bearer ${mockAccessToken}`);
 
-    // 9. Classroom
+    // 9. Tasks (NEW)
+    await tasks.createTask(mockAccessToken, { title: "Review milestone", taskListId: "@default" });
+    const taskCall = calls.pop();
+    assert.ok(taskCall.url.includes("tasks.googleapis.com/tasks/v1/lists/%40default/tasks"));
+    assert.equal(taskCall.init.headers.Authorization, `Bearer ${mockAccessToken}`);
+
+    // 10. Contacts (NEW)
+    await contacts.listContacts(mockAccessToken, 5);
+    const contactCall = calls.pop();
+    assert.ok(contactCall.url.includes("people.googleapis.com/v1/people/me/connections"));
+    assert.equal(contactCall.init.headers.Authorization, `Bearer ${mockAccessToken}`);
+
+    // 11. Chat
+    await chat.sendMessage(mockAccessToken, { space: "spaces/demo", text: "Alert" });
+    const chatCall = calls.pop();
+    assert.ok(chatCall.url.includes("chat.googleapis.com/v1/spaces/demo/messages"));
+    assert.equal(chatCall.init.headers.Authorization, `Bearer ${mockAccessToken}`);
+
+    // 12. Maps (NEW)
+    await maps.searchPlaces("Stanford University");
+    const mapsCall = calls.pop();
+    assert.ok(mapsCall.url.includes("maps.googleapis.com/maps/api/place/textsearch/json"));
+    assert.ok(mapsCall.url.includes("key=mock-maps-key-12345"));
+
+    // 13. Classroom
     await classroom.listCourses(mockAccessToken, 5);
     const classCall = calls.pop();
     assert.ok(classCall.url.includes("classroom.googleapis.com/v1/courses"));
     assert.equal(classCall.init.headers.Authorization, `Bearer ${mockAccessToken}`);
 
-    // 10. Chat
-    await chat.sendMessage(mockAccessToken, { space: "demo", text: "Alert" });
-    const chatCall = calls.pop();
-    assert.ok(chatCall.url.includes("chat.googleapis.com/v1/spaces/demo/messages"));
-    assert.equal(chatCall.init.headers.Authorization, `Bearer ${mockAccessToken}`);
+    // 14. YouTube (NEW)
+    await youtube.searchVideos(mockAccessToken, "TypeScript Tutorial", 5);
+    const ytCall = calls.pop();
+    assert.ok(ytCall.url.includes("googleapis.com/youtube/v3/search"));
+    assert.equal(ytCall.init.headers.Authorization, `Bearer ${mockAccessToken}`);
   } finally {
     globalThis.fetch = originalFetch;
   }
+});
+
+test("Multi-Agent Planning Intent Dispatching (14 Services)", async (t) => {
+  const { registry } = buildMindSpaceAgents();
+
+  await t.test("plans Tasks agent when user requests task creation", () => {
+    const plan = planGoal("Add a task to complete my assignment", registry, false);
+    assert.ok(plan.steps.some((s) => s.agent === "tasks"));
+  });
+
+  await t.test("plans Contacts agent when user searches people", () => {
+    const plan = planGoal("Find my professor's contact", registry, false);
+    assert.ok(plan.steps.some((s) => s.agent === "contacts"));
+  });
+
+  await t.test("plans Maps agent when user asks for places or routes", () => {
+    const plan = planGoal("Find nearby libraries with Google Maps", registry, false);
+    assert.ok(plan.steps.some((s) => s.agent === "maps"));
+  });
+
+  await t.test("plans YouTube agent when user asks for tutorials", () => {
+    const plan = planGoal("Search YouTube for machine learning lectures", registry, false);
+    assert.ok(plan.steps.some((s) => s.agent === "youtube"));
+  });
+
+  await t.test("plans Meet agent when user asks for video call", () => {
+    const plan = planGoal("Create a Google Meet for tomorrow", registry, false);
+    assert.ok(plan.steps.some((s) => s.agent === "meet"));
+  });
+
+  await t.test("plans Classroom agent when user checks assignments", () => {
+    const plan = planGoal("Show my Classroom courses and coursework", registry, false);
+    assert.ok(plan.steps.some((s) => s.agent === "classroom"));
+  });
 });

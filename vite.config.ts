@@ -12,4 +12,43 @@ export default defineConfig({
     // nitro/vite builds from this
     server: { entry: "server" },
   },
+  vite: {
+    // Pre-bundle heavy dependencies so the SSR module runner does not time out
+    // while waiting for the initial dependency optimization crawl to finish.
+    optimizeDeps: {
+      include: [
+        "react",
+        "react-dom",
+        "react/jsx-runtime",
+        "react-dom/client",
+        "@tanstack/react-router",
+        "@tanstack/react-query",
+        "@supabase/supabase-js",
+        "recharts",
+        "lucide-react",
+        "motion",
+        "pdfjs-dist",
+        "clsx",
+        "tailwind-merge",
+        "zod",
+        "sonner",
+        "date-fns",
+        "cmdk",
+        "nanoid",
+        "ai",
+      ],
+    },
+    ssr: {
+      // Externalise heavy SSR deps to avoid bundling them into the module runner
+      optimizeDeps: {
+        include: [
+          "react",
+          "react-dom",
+          "react/jsx-runtime",
+          "@tanstack/react-router",
+          "@tanstack/react-query",
+        ],
+      },
+    },
+  },
 });

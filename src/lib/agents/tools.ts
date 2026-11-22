@@ -10,8 +10,8 @@ import { z } from "zod";
 
 import { clip, contentTokens, normaliseWhitespace, splitSentences } from "./text-utils";
 import { makeId } from "./types";
-import type { GoogleServices } from "@/lib/google/adapter.server";
-import type { TaskService } from "@/lib/reminders/types";
+import type { GoogleServices } from "../google/adapter.server";
+import type { TaskService } from "../reminders/types";
 
 /* ------------------------------------------------------------------ */
 /* Registry                                                            */

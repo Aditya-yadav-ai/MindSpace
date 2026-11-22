@@ -25,7 +25,7 @@ import type {
   SheetRange,
   SlidesCreateResult,
   SlidesSummary,
-} from "@/lib/google/types";
+} from "../google/types";
 import type { TaskPayload } from "./types";
 
 function plural(count: number, word: string) {
@@ -296,3 +296,13 @@ export class ChatAgent extends BaseAgent {
     return { summary: `Found ${plural(spaces.length, "space")}.`, output: { spaces } };
   }
 }
+
+export {
+  DocsAgent as GoogleDocsAgent,
+  SheetsAgent as GoogleSheetsAgent,
+  SlidesAgent as GoogleSlidesAgent,
+  FormsAgent as GoogleFormsAgent,
+  MeetAgent as GoogleMeetAgent,
+  ClassroomAgent as GoogleClassroomAgent,
+  ChatAgent as GoogleChatAgent,
+};

@@ -114,7 +114,7 @@ class TestGapAnalysisHardening:
         with db.connection() as conn:
             conn.execute(
                 """
-                INSERT INTO p2p_messages_store (tenant_id, user_id, msg_id, correlation_id, sender, recipient, msg_type, content)
+                INSERT OR REPLACE INTO p2p_messages_store (tenant_id, user_id, msg_id, correlation_id, sender, recipient, msg_type, content)
                 VALUES (?, ?, ?, ?, ?, ?, ?, ?)
                 """,
                 (tenant, user, "msg-101", "corr-101", "sender-a", "user-audit-1", "task", '{"action": "run"}'),

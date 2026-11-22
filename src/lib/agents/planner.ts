@@ -28,6 +28,10 @@ export type PlanIntent =
   | "meet"
   | "classroom"
   | "chat"
+  | "tasks"
+  | "contacts"
+  | "maps"
+  | "youtube"
   | "product"
   | "task_manage";
 
@@ -47,6 +51,11 @@ const INTENT_KEYWORDS: Record<PlanIntent, RegExp> = {
   meet: /\b(meet link|video call|meeting link|google meet)\b/i,
   classroom: /\b(classroom|coursework|assignment)\b/i,
   chat: /\b(google chat|chat space|chat message)\b/i,
+  tasks:
+    /\b(google tasks?|add (?:a )?task|pending tasks?|complete (?:my )?task|my tasks|task list)\b/i,
+  contacts: /\b(contact|contacts|professor's contact|people|phone number|address book)\b/i,
+  maps: /\b(google maps?|nearby|directions|route to|places?|find restaurants?|libraries)\b/i,
+  youtube: /\b(youtube|tutorial|tutorials|video|videos|lectures?|educational playlists?)\b/i,
   product: /\b(product|price|buy|purchase|shop(?:ping)?)\b/i,
   task_manage:
     /\b(save (?:a |this )?reminder|create a (?:real )?task|add (?:a |this )?(?:task|reminder)|list my (?:tasks|reminders)|mark .* done|complete (?:the |this |my )?(?:task|reminder)|delete (?:the |this |my )?(?:task|reminder))\b/i,
@@ -342,6 +351,74 @@ export function planGoal(goal: string, registry: AgentRegistry, hasPageText: boo
       notes.push(
         "Sending a chat message needs a space and message text — the agent will ask if missing.",
       );
+  }
+
+  if (intents.includes("tasks") && missing("tasks", "Google Tasks")) {
+    const wantsCreate = /\b(add|create|new|schedule)\b/i.test(goal);
+    const wantsComplete = /\b(complete|done|finish)\b/i.test(goal);
+    const wantsDelete = /\b(delete|remove)\b/i.test(goal);
+    const action = wantsCreate
+      ? "create"
+      : wantsComplete
+        ? "complete"
+        : wantsDelete
+          ? "delete"
+          : "list";
+    steps.push({
+      id: `s${steps.length + 1}`,
+      agent: "tasks",
+      goal:
+        action === "create"
+          ? "Create a task in Google Tasks."
+          : action === "complete"
+            ? "Complete a task."
+            : action === "delete"
+              ? "Delete a task."
+              : "List pending tasks.",
+      input: { action },
+      dependsOn: [],
+    });
+    if (action !== "list") {
+      notes.push(`Task ${action} requires confirmation before modifying real Google Tasks.`);
+    }
+  }
+
+  if (intents.includes("contacts") && missing("contacts", "Google Contacts")) {
+    const wantsCreate = /\b(create|add|new)\b/i.test(goal);
+    steps.push({
+      id: `s${steps.length + 1}`,
+      agent: "contacts",
+      goal: wantsCreate ? "Create a contact in Google Contacts." : "Search Google Contacts.",
+      input: wantsCreate ? { action: "create" } : { action: "search", query: goal },
+      dependsOn: [],
+    });
+    if (wantsCreate) {
+      notes.push("Creating a contact requires confirmation and at least a name.");
+    }
+  }
+
+  if (intents.includes("maps") && missing("maps", "Google Maps")) {
+    const wantsDirections = /\b(route|directions?|how to get to)\b/i.test(goal);
+    steps.push({
+      id: `s${steps.length + 1}`,
+      agent: "maps",
+      goal: wantsDirections
+        ? "Calculate directions and route via Google Maps."
+        : "Search places on Google Maps.",
+      input: wantsDirections ? { action: "directions" } : { action: "search", query: goal },
+      dependsOn: [],
+    });
+  }
+
+  if (intents.includes("youtube") && missing("youtube", "YouTube")) {
+    const wantsPlaylist = /\b(playlist|playlists)\b/i.test(goal);
+    steps.push({
+      id: `s${steps.length + 1}`,
+      agent: "youtube",
+      goal: wantsPlaylist ? "Find YouTube playlists." : "Search videos on YouTube.",
+      input: wantsPlaylist ? { action: "playlists" } : { action: "search", query: goal },
+      dependsOn: [],
+    });
   }
 
   if (intents.includes("remind") && missing("task-drafter", "reminder drafting")) {

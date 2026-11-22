@@ -17,7 +17,6 @@
  * 1. Add the variable to :root (light value) and .dark (dark value)
  * 2. Register it in @theme inline as --color-<name>: var(--<name>)
  */
-
 @theme inline {
   --font-display: "Inter", system-ui, sans-serif;
   --font-body: "Inter", system-ui, sans-serif;
@@ -250,12 +249,14 @@
   box-shadow:
     0 1px 2px 0 oklch(0.2 0.02 260 / 0.05),
     0 2px 6px -1px oklch(0.5 0.15 264 / 0.12);
+
   &:hover {
     transform: translateY(-1.5px);
     box-shadow:
       0 3px 8px 0 oklch(0.2 0.02 260 / 0.08),
       0 6px 16px -2px oklch(0.5 0.15 264 / 0.22);
   }
+
   &:active {
     transform: translateY(1px);
     box-shadow: 0 1px 2px 0 oklch(0.2 0.02 260 / 0.06);
@@ -291,6 +292,7 @@
     opacity: 1;
     transform: scale(1);
   }
+
   50% {
     opacity: 0.45;
     transform: scale(0.82);
@@ -301,9 +303,11 @@
   0% {
     transform: rotate(0deg) scale(1);
   }
+
   50% {
     transform: rotate(180deg) scale(1.05);
   }
+
   100% {
     transform: rotate(360deg) scale(1);
   }
@@ -314,6 +318,7 @@
   100% {
     filter: drop-shadow(0 0 12px oklch(0.55 0.22 264 / 0.45));
   }
+
   50% {
     filter: drop-shadow(0 0 24px oklch(0.65 0.25 290 / 0.7));
   }
@@ -340,6 +345,7 @@
     opacity: 0;
     transform: translateY(4px);
   }
+
   to {
     opacity: 1;
     transform: translateY(0);
@@ -355,6 +361,7 @@
   .animate-rise {
     animation: none;
   }
+
   *,
   *::before,
   *::after {

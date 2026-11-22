@@ -32,6 +32,48 @@ interface LocalDocument extends KnowledgeDocument {
   chunks: string[];
 }
 
+/** Determine Chrome-extension or web-compatible URL for standard PDF.js fonts. Trailing slash is mandatory. */
+function getStandardFontDataUrl(): string {
+  if (typeof chrome !== "undefined" && typeof chrome.runtime?.getURL === "function") {
+    try {
+      const url = chrome.runtime.getURL("standard_fonts/");
+      if (url) return url.endsWith("/") ? url : `${url}/`;
+    } catch {
+      // Fallback if extension context is not yet initialized
+    }
+  }
+  if (
+    typeof window !== "undefined" &&
+    window.location?.origin &&
+    window.location.origin !== "null"
+  ) {
+    const base = window.location.origin.replace(/\/+$/, "");
+    return `${base}/standard_fonts/`;
+  }
+  return "/standard_fonts/";
+}
+
+/** Determine Chrome-extension or web-compatible URL for PDF.js CMaps. Trailing slash is mandatory. */
+function getCMapUrl(): string {
+  if (typeof chrome !== "undefined" && typeof chrome.runtime?.getURL === "function") {
+    try {
+      const url = chrome.runtime.getURL("cmaps/");
+      if (url) return url.endsWith("/") ? url : `${url}/`;
+    } catch {
+      // Fallback
+    }
+  }
+  if (
+    typeof window !== "undefined" &&
+    window.location?.origin &&
+    window.location.origin !== "null"
+  ) {
+    const base = window.location.origin.replace(/\/+$/, "");
+    return `${base}/cmaps/`;
+  }
+  return "/cmaps/";
+}
+
 /** Extract text from a PDF in the browser with pdf.js. */
 async function readPdf(file: File): Promise<string> {
   const pdfjs = await import("pdfjs-dist");
@@ -39,7 +81,20 @@ async function readPdf(file: File): Promise<string> {
   pdfjs.GlobalWorkerOptions.workerSrc = workerUrl;
 
   const buffer = await file.arrayBuffer();
-  const pdf = await pdfjs.getDocument({ data: new Uint8Array(buffer) }).promise;
+  const fontUrl = getStandardFontDataUrl();
+  const cMapUrl = getCMapUrl();
+
+  const loadingTask = pdfjs.getDocument({
+    data: new Uint8Array(buffer),
+    standardFontDataUrl: fontUrl,
+    cMapUrl: cMapUrl,
+    cMapPacked: true,
+    useWorkerFetch: false,
+    isEvalSupported: false,
+    useSystemFonts: true,
+  });
+
+  const pdf = await loadingTask.promise;
   const parts: string[] = [];
   for (let pageNumber = 1; pageNumber <= pdf.numPages; pageNumber += 1) {
     const page = await pdf.getPage(pageNumber);

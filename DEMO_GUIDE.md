@@ -30,6 +30,7 @@ graph TD
 ## 2. Five-to-Ten Minute Live Viva Demonstration Script
 
 ### Minute 0–2: System Startup & Zero-Cloud Verification
+
 1. Open PowerShell and run the one-command setup verification:
    ```powershell
    .\start-demo.ps1
@@ -40,6 +41,7 @@ graph TD
    - Security controls: PyJWT cryptographic validation with clock skew tolerance, compound tenant isolation `(tenant_id, user_id)`, and physical socket-level SSRF defense.
 
 ### Minute 2–4: Extension Installation & Context Ingestion
+
 1. Open Google Chrome $\to$ Navigate to `chrome://extensions`.
 2. Toggle **Developer mode** $\to$ Click **Load unpacked** $\to$ Select:
    `mindspace-stage8/dist-extension`
@@ -52,6 +54,7 @@ graph TD
    - Point out the proactive restricted-page handling: attempting capture on `chrome://` or Web Store returns clean user guidance rather than crashing.
 
 ### Minute 4–6: Multi-Agent Lifecycle & P2P Coordination
+
 1. In the terminal, execute the 8-step live walkthrough:
    ```powershell
    npm run demo
@@ -67,6 +70,7 @@ graph TD
    - **Step 8 (Audit Logging)**: Commits end-to-end execution trace into Blackboard audit log.
 
 ### Minute 6–8: Document Intelligence & RAG Inspection
+
 1. Show the sample research papers located in `sample_documents/`:
    - `attention_transformer_research.txt`
    - `multi_agent_blackboard_systems.txt`
@@ -75,6 +79,7 @@ graph TD
 3. Demonstrate RAG citation attribution: queries return exact document chunks with similarity scores.
 
 ### Minute 8–10: Observability, Diagnostics & Data Erasure
+
 1. Inspect the operational diagnostics endpoint:
    ```powershell
    curl http://127.0.0.1:8010/v1/diagnostics
@@ -95,21 +100,21 @@ graph TD
 
 ## 3. Technology Justification & Overlap Analysis
 
-| Technology | Role in MindSpace | Why Selected? | Alternatives & Trade-offs |
-|---|---|---|---|
-| **Chrome Manifest V3** | Browser Side Panel | Direct access to active tab DOM, viewport capture, and persistent side panel without breaking Chromium security policies. | Content-script-only: lacks UI space; DevTools panel: too developer-specific. |
-| **FastAPI (Python 3.12)** | Agent API & Gateway | High-throughput async routing, native Pydantic v2 data contracts, ASGI middleware. | Flask (synchronous, slower); Node.js (harder to integrate Python AI/MAS libraries). |
-| **TanStack Start & React 19** | Full-Stack Web Interface | Type-safe SSR, unified server functions (`createServerFn`), modern component reactivity. | Next.js (heavier, opinionated); Plain React SPA (no SSR, poorer SEO/previews). |
-| **Blackboard Pattern** | Shared Multi-Agent State | Loose coupling: agents communicate results through append-only state bus rather than pairwise interdependencies. | Pure message bus: lacks central snapshot; Shared memory: non-persistent across worker restarts. |
-| **P2P Mailbox** | Direct Agent Collaboration | Addressed, sequence-tracked, TTL-enforced inter-agent delivery for correlated task dispatches. | Polling: wasteful; Direct RPC: blocks agent threads during long runs. |
-| **Model Context Protocol (MCP)** | Standardized Tool Interface | Vendor-neutral protocol for research tools (`web_search`, `extract_facts`) with socket-level SSRF interceptor. | Hardcoded Python functions: breaks agent modularity and external tool interoperability. |
-| **A2A Protocol** | Agent-to-Agent SDK | Official Google `a2a-sdk` for JSON-RPC agent discovery and task delegation. | REST shortcuts: non-standardized metadata envelopes. |
-| **Lexical Vector RAG** | Offline Knowledge Search | Deterministic hashed bag-of-words (`hash-bow-v1`) with cosine similarity and token overlap, requiring zero cloud embedding APIs. | Cloud embeddings (OpenAI/Voyage): breaks zero-external-dependency requirement. |
+| Technology                       | Role in MindSpace           | Why Selected?                                                                                                                    | Alternatives & Trade-offs                                                                       |
+| -------------------------------- | --------------------------- | -------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------- |
+| **Chrome Manifest V3**           | Browser Side Panel          | Direct access to active tab DOM, viewport capture, and persistent side panel without breaking Chromium security policies.        | Content-script-only: lacks UI space; DevTools panel: too developer-specific.                    |
+| **FastAPI (Python 3.12)**        | Agent API & Gateway         | High-throughput async routing, native Pydantic v2 data contracts, ASGI middleware.                                               | Flask (synchronous, slower); Node.js (harder to integrate Python AI/MAS libraries).             |
+| **TanStack Start & React 19**    | Full-Stack Web Interface    | Type-safe SSR, unified server functions (`createServerFn`), modern component reactivity.                                         | Next.js (heavier, opinionated); Plain React SPA (no SSR, poorer SEO/previews).                  |
+| **Blackboard Pattern**           | Shared Multi-Agent State    | Loose coupling: agents communicate results through append-only state bus rather than pairwise interdependencies.                 | Pure message bus: lacks central snapshot; Shared memory: non-persistent across worker restarts. |
+| **P2P Mailbox**                  | Direct Agent Collaboration  | Addressed, sequence-tracked, TTL-enforced inter-agent delivery for correlated task dispatches.                                   | Polling: wasteful; Direct RPC: blocks agent threads during long runs.                           |
+| **Model Context Protocol (MCP)** | Standardized Tool Interface | Vendor-neutral protocol for research tools (`web_search`, `extract_facts`) with socket-level SSRF interceptor.                   | Hardcoded Python functions: breaks agent modularity and external tool interoperability.         |
+| **A2A Protocol**                 | Agent-to-Agent SDK          | Official Google `a2a-sdk` for JSON-RPC agent discovery and task delegation.                                                      | REST shortcuts: non-standardized metadata envelopes.                                            |
+| **Lexical Vector RAG**           | Offline Knowledge Search    | Deterministic hashed bag-of-words (`hash-bow-v1`) with cosine similarity and token overlap, requiring zero cloud embedding APIs. | Cloud embeddings (OpenAI/Voyage): breaks zero-external-dependency requirement.                  |
 
 ---
 
 ## 4. Key Limitations & Future Work
 
 1. **Local Neural Embeddings**: Currently utilizes deterministic `hash-bow-v1` lexical vector hashing for offline mode. Future iterations can integrate local ONNX/GGUF models (e.g. `bge-small-en-v1.5`) via in-process WebAssembly/FastAPI.
-2. **Google Cloud Live OAuth**: Requires operator registration of a Web Application Client in Google Cloud Console for live Gmail/Drive sync. The system fails closed safely via `GoogleNotConnectedError` when disconnected.
+2. **Google Cloud Live OAuth**: Requires operator registration of a Web Application Client in Google Cloud Console and a backend Maps API key for live 14 Google services synchronization (see [docs/google-services-matrix.md](docs/google-services-matrix.md)). The system fails closed safely via `GoogleNotConnectedError` with user-friendly guidance when disconnected.
 3. **Distributed Worker Clustered Limiter**: In-memory `SlidingWindowRateLimiter` handles single-server deployments; distributed multi-container deployments can bind to Redis via `REDIS_URL`.

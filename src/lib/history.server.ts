@@ -29,22 +29,42 @@ export async function recordAgentRun(
   result: WorkflowResult,
   automationId?: string,
 ): Promise<void> {
-  const { error } = await supabaseAdmin.from("agent_runs").insert({
+  try {
+    const { error } = await supabaseAdmin.from("agent_runs").insert({
+      id: result.runId,
+      user_id: userId,
+      goal: result.goal,
+      status: result.status,
+      answer: result.answer,
+      verification_verdict: result.verification.verdict,
+      verification_score: result.verification.score,
+      step_count: result.steps.length,
+      failed_count: result.steps.filter((step) => step.status === "failed").length,
+      plan: result.plan as unknown as Json,
+      steps: trimSteps(result.steps),
+      verification: result.verification as unknown as Json,
+      automation_id: automationId ?? null,
+    });
+    if (!error) return;
+  } catch {
+    // Supabase unavailable; fall through to local SQLite
+  }
+
+  const { recordLocalAgentRun } = await import("@/lib/local-db.server");
+  recordLocalAgentRun(userId, {
     id: result.runId,
-    user_id: userId,
     goal: result.goal,
     status: result.status,
     answer: result.answer,
-    verification_verdict: result.verification.verdict,
-    verification_score: result.verification.score,
-    step_count: result.steps.length,
-    failed_count: result.steps.filter((step) => step.status === "failed").length,
-    plan: result.plan as unknown as Json,
-    steps: trimSteps(result.steps),
-    verification: result.verification as unknown as Json,
-    automation_id: automationId ?? null,
+    verificationVerdict: result.verification.verdict,
+    verificationScore: result.verification.score,
+    stepCount: result.steps.length,
+    failedCount: result.steps.filter((step) => step.status === "failed").length,
+    plan: result.plan,
+    steps: result.steps,
+    verification: result.verification,
+    automationId: automationId ?? null,
   });
-  if (error) throw new Error(error.message);
 }
 
 export type StoredAgentRun = {

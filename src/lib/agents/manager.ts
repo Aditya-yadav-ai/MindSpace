@@ -27,16 +27,23 @@ import {
   ChatAgent,
 } from "./google-workspace-agents";
 import { createGoogleWorkspaceTools } from "./google-workspace-tools";
+import {
+  GoogleTasksAgent,
+  GoogleContactsAgent,
+  GoogleMapsAgent,
+  YouTubeAgent,
+} from "./google-extended-agents";
+import { createGoogleExtendedTools } from "./google-extended-tools";
 import { createWebTools } from "./web-tools";
 import { createReminderTools } from "./reminder-tools";
 import { WebReaderAgent } from "./web-reader-agent";
 import { ProductAgent } from "./product-agent";
 import { ReminderAgent } from "./reminder-agent";
 import { verifyWorkflow } from "./verifier";
-import { notConnectedGoogleServices } from "@/lib/google/not-connected";
-import { notConnectedTaskService } from "@/lib/reminders/not-connected";
-import type { GoogleServices } from "@/lib/google/adapter.server";
-import type { TaskService } from "@/lib/reminders/types";
+import { notConnectedGoogleServices } from "../google/not-connected";
+import { notConnectedTaskService } from "../reminders/not-connected";
+import type { GoogleServices } from "../google/adapter.server";
+import type { TaskService } from "../reminders/types";
 import {
   readPath,
   type ErrorPayload,
@@ -62,6 +69,7 @@ export function buildMindSpaceAgents(options: BuildMindSpaceAgentsOptions = {}) 
   for (const tool of createBuiltinTools(kb)) tools.register(tool);
   for (const tool of createGoogleTools()) tools.register(tool);
   for (const tool of createGoogleWorkspaceTools()) tools.register(tool);
+  for (const tool of createGoogleExtendedTools()) tools.register(tool);
   for (const tool of createWebTools()) tools.register(tool);
   for (const tool of createReminderTools()) tools.register(tool);
 
@@ -82,6 +90,10 @@ export function buildMindSpaceAgents(options: BuildMindSpaceAgentsOptions = {}) 
     new MeetAgent(),
     new ClassroomAgent(),
     new ChatAgent(),
+    new GoogleTasksAgent(),
+    new GoogleContactsAgent(),
+    new GoogleMapsAgent(),
+    new YouTubeAgent(),
     new WebReaderAgent(),
     new ProductAgent(),
     new ReminderAgent(),

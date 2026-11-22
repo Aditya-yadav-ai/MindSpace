@@ -12,9 +12,10 @@ import type { GoogleConnectionStatus } from "@/lib/google/types";
 
 export const getGoogleAuthUrl = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
-  .handler(async ({ context }): Promise<{ url: string }> => {
+  .validator((d: { scopes?: string[] } | undefined) => d ?? {})
+  .handler(async ({ data, context }): Promise<{ url: string }> => {
     const { createAuthorizationUrl } = await import("@/lib/google/oauth.server");
-    return { url: await createAuthorizationUrl(context.userId) };
+    return { url: await createAuthorizationUrl(context.userId, data?.scopes, context.email) };
   });
 
 export const getGoogleStatus = createServerFn({ method: "GET" })

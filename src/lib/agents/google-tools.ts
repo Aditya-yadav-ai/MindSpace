@@ -10,7 +10,7 @@
 import { z } from "zod";
 
 import { defineTool } from "./tools";
-import { GoogleNotConnectedError } from "@/lib/google/types";
+import { GoogleNotConnectedError } from "../google/types";
 
 function requireConnected<T>(fn: () => Promise<T>): Promise<T> {
   return fn().catch((error) => {

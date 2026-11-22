@@ -38,14 +38,19 @@ const IdInput = z.object({ taskId: z.string().uuid() });
 export const listTasks = createServerFn({ method: "GET" })
   .middleware([requireSupabaseAuth])
   .handler(async ({ context }): Promise<TaskRecord[]> => {
-    const { data, error } = await context.supabase
-      .from("tasks")
-      .select("id,title,notes,due_at,status,source,source_run_id,created_at,updated_at")
-      .order("status", { ascending: true })
-      .order("due_at", { ascending: true, nullsFirst: false })
-      .order("created_at", { ascending: false });
-    if (error) throw new Error(error.message);
-    return (data ?? []) as TaskRecord[];
+    try {
+      const { data, error } = await context.supabase
+        .from("tasks")
+        .select("id,title,notes,due_at,status,source,source_run_id,created_at,updated_at")
+        .order("status", { ascending: true })
+        .order("due_at", { ascending: true, nullsFirst: false })
+        .order("created_at", { ascending: false });
+      if (!error && data) return data as TaskRecord[];
+    } catch {
+      // Supabase unavailable; fall through to local SQLite
+    }
+    const { getLocalTasks } = await import("@/lib/local-db.server");
+    return getLocalTasks(context.userId);
   });
 
 /** Create a task directly from the UI (source: "manual"). */
@@ -53,30 +58,45 @@ export const createTask = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .inputValidator((input: unknown) => CreateTaskInput.parse(input))
   .handler(async ({ data, context }): Promise<TaskRecord> => {
-    const { data: inserted, error } = await context.supabase
-      .from("tasks")
-      .insert({
-        user_id: context.userId,
-        title: data.title,
-        notes: data.notes,
-        due_at: data.dueAt,
-        source: "manual",
-      })
-      .select("id,title,notes,due_at,status,source,source_run_id,created_at,updated_at")
-      .single();
-    if (error || !inserted) throw new Error(error?.message ?? "Could not create this task.");
-    return inserted as TaskRecord;
+    try {
+      const { data: inserted, error } = await context.supabase
+        .from("tasks")
+        .insert({
+          user_id: context.userId,
+          title: data.title,
+          notes: data.notes,
+          due_at: data.dueAt,
+          source: "manual",
+        })
+        .select("id,title,notes,due_at,status,source,source_run_id,created_at,updated_at")
+        .single();
+      if (!error && inserted) return inserted as TaskRecord;
+    } catch {
+      // Supabase unavailable; fall through to local SQLite
+    }
+    const { createLocalTask } = await import("@/lib/local-db.server");
+    return createLocalTask(context.userId, {
+      title: data.title,
+      notes: data.notes,
+      dueAt: data.dueAt,
+    });
   });
 
 export const updateTaskStatus = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .inputValidator((input: unknown) => UpdateStatusInput.parse(input))
   .handler(async ({ data, context }): Promise<{ ok: true }> => {
-    const { error } = await context.supabase
-      .from("tasks")
-      .update({ status: data.status })
-      .eq("id", data.taskId);
-    if (error) throw new Error(error.message);
+    try {
+      const { error } = await context.supabase
+        .from("tasks")
+        .update({ status: data.status })
+        .eq("id", data.taskId);
+      if (!error) return { ok: true };
+    } catch {
+      // Supabase unavailable; fall through to local SQLite
+    }
+    const { updateLocalTaskStatus } = await import("@/lib/local-db.server");
+    updateLocalTaskStatus(data.taskId, data.status);
     return { ok: true };
   });
 
@@ -84,7 +104,13 @@ export const deleteTask = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .inputValidator((input: unknown) => IdInput.parse(input))
   .handler(async ({ data, context }): Promise<{ ok: true }> => {
-    const { error } = await context.supabase.from("tasks").delete().eq("id", data.taskId);
-    if (error) throw new Error(error.message);
+    try {
+      const { error } = await context.supabase.from("tasks").delete().eq("id", data.taskId);
+      if (!error) return { ok: true };
+    } catch {
+      // Supabase unavailable; fall through to local SQLite
+    }
+    const { deleteLocalTask } = await import("@/lib/local-db.server");
+    deleteLocalTask(data.taskId);
     return { ok: true };
   });

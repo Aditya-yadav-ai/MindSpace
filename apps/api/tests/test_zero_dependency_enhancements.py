@@ -153,3 +153,4 @@ class TestZeroDependencyEnhancements:
         assert data["steps_count"] == 8
         assert "execution_trace" in data
         assert len(data["execution_trace"]) == 8
+

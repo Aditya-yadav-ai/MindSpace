@@ -20,7 +20,7 @@ import type {
   DriveSaveResult,
   GmailDraftResult,
   GmailMessageSummary,
-} from "@/lib/google/types";
+} from "../google/types";
 import type { TaskPayload } from "./types";
 
 function plural(count: number, word: string) {
@@ -199,3 +199,9 @@ export class DriveAgent extends BaseAgent {
     };
   }
 }
+
+export {
+  CalendarAgent as GoogleCalendarAgent,
+  DriveAgent as GoogleDriveAgent,
+  GmailAgent as GoogleGmailAgent,
+};

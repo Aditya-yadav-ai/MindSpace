@@ -142,7 +142,10 @@ class FullSystemE2ETests(unittest.TestCase):
         """When the upstream model provider fails, the service returns a retryable 503 envelope."""
         from app.llm import LLMError
 
-        with mock.patch.object(settings, "offline_mode", False), \
+        with mock.patch.object(settings, "jwt_secret", E2E_JWT_SECRET), \
+             mock.patch.object(settings, "jwt_issuer", E2E_ISSUER), \
+             mock.patch.object(settings, "jwt_audience", E2E_AUDIENCE), \
+             mock.patch.object(settings, "offline_mode", False), \
              mock.patch.object(settings, "groq_api_key", "gsk_dummy_real_looking_key_1234567890"), \
              mock.patch("app.main.generate", side_effect=LLMError("Groq service rate limited: HTTP 429", retryable=True)):
 

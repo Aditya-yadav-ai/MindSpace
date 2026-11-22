@@ -17,6 +17,11 @@ export function TopBar({
   quiet = false,
   onOpenMenu,
   onAddPageText,
+  onSignOut,
+  userInitials,
+  userName,
+  userEmail,
+  preview,
 }: {
   pageTitle: string;
   domain: string;
@@ -24,6 +29,11 @@ export function TopBar({
   quiet?: boolean;
   onOpenMenu: () => void;
   onAddPageText: () => void;
+  onSignOut?: () => void;
+  userInitials?: string;
+  userName?: string;
+  userEmail?: string;
+  preview?: boolean;
 }) {
   const { resolvedTheme, toggleTheme } = useTheme();
 
@@ -57,7 +67,7 @@ export function TopBar({
         className="hidden lg:inline-flex items-center gap-1.5 rounded-full border border-primary/20 bg-primary/5 px-2.5 py-0.5 text-[11px] font-medium text-foreground/80 shadow-xs"
       >
         <span className="size-1.5 rounded-full bg-primary" aria-hidden="true" />
-        Local / Zero-Cloud
+        {preview ? "Demo Mode" : "Authenticated"}
       </span>
 
       <StatusPill
@@ -91,6 +101,15 @@ export function TopBar({
           <Moon className="size-4" aria-hidden="true" />
         )}
       </Button>
+
+      {userInitials && (
+        <div
+          title={`${userName || "User"} (${userEmail || ""})`}
+          className="hidden sm:grid size-7 shrink-0 place-items-center rounded-full bg-primary/10 border border-primary/30 text-[11px] font-semibold text-primary"
+        >
+          {userInitials}
+        </div>
+      )}
 
       <Button
         variant="outline"

@@ -9,6 +9,7 @@
 import { comparable, detectInjectionSignals } from "./text-utils";
 import { CONSEQUENTIAL_GOOGLE_TOOLS } from "./google-tools";
 import { CONSEQUENTIAL_WORKSPACE_TOOLS } from "./google-workspace-tools";
+import { CONSEQUENTIAL_EXTENDED_TOOLS } from "./google-extended-tools";
 import { CONSEQUENTIAL_REMINDER_TOOLS } from "./reminder-tools";
 import type { StepResult, VerificationCheck, VerificationReport, WorkflowPage } from "./types";
 
@@ -164,10 +165,15 @@ export function verifyWorkflow(
     "meet",
     "classroom",
     "chat",
+    "tasks",
+    "contacts",
+    "maps",
+    "youtube",
   ];
   const ALL_CONSEQUENTIAL_TOOLS = [
     ...CONSEQUENTIAL_GOOGLE_TOOLS,
     ...CONSEQUENTIAL_WORKSPACE_TOOLS,
+    ...CONSEQUENTIAL_EXTENDED_TOOLS,
     ...CONSEQUENTIAL_REMINDER_TOOLS,
   ];
   const googleAgentSteps = steps.filter((step) =>

@@ -13,6 +13,30 @@ import appCss from "../styles.css?url";
 import { reportLovableError } from "../lib/lovable-error-reporting";
 
 function NotFoundComponent() {
+  useEffect(() => {
+    if (typeof window !== "undefined") {
+      const path = window.location.pathname.replace(/^\/+|\/+$/g, "").toLowerCase();
+      const validViews = [
+        "overview",
+        "capture",
+        "agents",
+        "saved",
+        "history",
+        "workspace",
+        "automations",
+        "approvals",
+        "notifications",
+        "accounts",
+        "observability",
+        "settings",
+      ];
+      if (validViews.includes(path)) {
+        window.location.replace(`/?view=${path}`);
+        return;
+      }
+    }
+  }, []);
+
   return (
     <div className="flex min-h-screen items-center justify-center bg-background px-4">
       <div className="max-w-md text-center">
@@ -21,13 +45,19 @@ function NotFoundComponent() {
         <p className="mt-2 text-sm text-muted-foreground">
           The page you're looking for doesn't exist or has been moved.
         </p>
-        <div className="mt-6">
+        <div className="mt-6 flex justify-center gap-3">
           <Link
             to="/"
             className="inline-flex items-center justify-center rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground transition-colors hover:bg-primary/90"
           >
             Go home
           </Link>
+          <a
+            href="/?view=overview"
+            className="inline-flex items-center justify-center rounded-md border border-input bg-background px-4 py-2 text-sm font-medium text-foreground transition-colors hover:bg-accent"
+          >
+            Open Overview
+          </a>
         </div>
       </div>
     </div>

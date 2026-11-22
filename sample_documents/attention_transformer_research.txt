@@ -26,3 +26,4 @@ where head_i = Attention(Q W_i^Q, K W_i^K, V W_i^V)
 
 Computational Complexity:
 Self-attention layers connect all positions with a constant number of sequentially executed operations O(1), whereas recurrent layers require O(n) sequential operations. In terms of computational complexity per layer, self-attention layers are O(n^2 * d), which is faster than recurrent layers when the sequence length n is smaller than the representation dimensionality d.
+

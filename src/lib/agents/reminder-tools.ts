@@ -10,7 +10,7 @@
 import { z } from "zod";
 
 import { defineTool } from "./tools";
-import { TaskServiceUnavailableError } from "@/lib/reminders/types";
+import { TaskServiceUnavailableError } from "../reminders/types";
 
 function requireTasks<T>(fn: () => Promise<T>): Promise<T> {
   return fn().catch((error) => {

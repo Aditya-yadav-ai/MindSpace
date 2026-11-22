@@ -9,7 +9,7 @@ import { z } from "zod";
 import { BaseAgent, type AgentContext, type AgentOutput, type AgentTools } from "./agent";
 import { clip } from "./text-utils";
 import type { TaskPayload } from "./types";
-import type { TaskServiceRecord } from "@/lib/reminders/types";
+import type { TaskServiceRecord } from "../reminders/types";
 
 function plural(count: number, word: string) {
   return `${count} ${word}${count === 1 ? "" : "s"}`;

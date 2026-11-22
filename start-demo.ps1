@@ -69,3 +69,4 @@ Write-Host "  4. Press Alt+B on any tab to open MindSpace." -ForegroundColor Gra
 Write-Host "`nTo execute the Multi-Agent Live Walkthrough:" -ForegroundColor White
 Write-Host "    npm run demo" -ForegroundColor Green
 Write-Host "============================================================`n" -ForegroundColor Cyan
+
