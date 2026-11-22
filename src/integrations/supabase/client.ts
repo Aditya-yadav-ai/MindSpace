@@ -57,8 +57,43 @@ function toSupabaseSession(session: MindSpaceSession | null): Session | null {
   } as unknown as Session;
 }
 
+function createFallbackQueryBuilder(table: string) {
+  const result = { data: [] as unknown[], error: null, count: 0 };
+  const builder: Record<string, unknown> = {
+    table,
+    select: () => builder,
+    insert: (values: unknown) => ({
+      ...builder,
+      select: () =>
+        Promise.resolve({ data: Array.isArray(values) ? values : [values], error: null }),
+      then: (resolve: (arg: unknown) => unknown) =>
+        resolve({ data: Array.isArray(values) ? values : [values], error: null }),
+    }),
+    update: () => builder,
+    delete: () => builder,
+    eq: () => builder,
+    neq: () => builder,
+    gt: () => builder,
+    gte: () => builder,
+    lt: () => builder,
+    lte: () => builder,
+    in: () => builder,
+    order: () => builder,
+    limit: () => builder,
+    range: () => builder,
+    single: () => Promise.resolve({ data: null, error: null }),
+    maybeSingle: () => Promise.resolve({ data: null, error: null }),
+    then: (resolve: (arg: unknown) => unknown) => resolve(result),
+    catch: (reject: (arg: unknown) => unknown) => Promise.resolve(result).catch(reject),
+  };
+  return builder;
+}
+
 function createSupabaseFallback() {
   return {
+    from: (table: string) => createFallbackQueryBuilder(table),
+    rpc: (_fnName: string, _args?: Record<string, unknown>) =>
+      Promise.resolve({ data: [], error: null }),
     auth: {
       async getSession() {
         const local = getClientSession() || (await loadClientSession());

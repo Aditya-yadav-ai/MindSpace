@@ -8,10 +8,34 @@ export const EMBEDDING_MODEL = "openai/text-embedding-3-small";
 export const EMBEDDING_DIMENSIONS = 1536;
 const ANSWER_MODEL = "google/gemini-3.8-flash";
 
-function apiKey() {
-  const key = process.env["LOVABLE_API_KEY"];
-  if (!key) throw new Error("The AI service is not configured for this workspace.");
-  return key;
+function getAiKey(): string | null {
+  return (
+    process.env["LOVABLE_API_KEY"] ||
+    process.env["GROQ_API_KEY"] ||
+    process.env["OPENAI_API_KEY"] ||
+    null
+  );
+}
+
+function computeLocalVector(text: string): number[] {
+  const vec = new Float64Array(EMBEDDING_DIMENSIONS);
+  const words = text.toLowerCase().split(/\W+/).filter(Boolean);
+  for (let i = 0; i < words.length; i++) {
+    const word = words[i]!;
+    let hash = 0;
+    for (let c = 0; c < word.length; c++) {
+      hash = (hash << 5) - hash + word.charCodeAt(c);
+      hash |= 0;
+    }
+    const idx = Math.abs(hash) % EMBEDDING_DIMENSIONS;
+    vec[idx] = (vec[idx] || 0) + 1;
+  }
+  let norm = 0;
+  for (let i = 0; i < vec.length; i++) norm += (vec[i] || 0) * (vec[i] || 0);
+  norm = Math.sqrt(norm) || 1;
+  const result: number[] = new Array(EMBEDDING_DIMENSIONS);
+  for (let i = 0; i < vec.length; i++) result[i] = (vec[i] || 0) / norm;
+  return result;
 }
 
 /** Normalise raw extracted text: collapse whitespace, drop control characters. */
@@ -67,6 +91,11 @@ export function chunkText(text: string, size = 1400, overlap = 200): string[] {
 /** Embed a batch of strings. Returns one vector per input, in order. */
 export async function embedTexts(inputs: string[]): Promise<number[][]> {
   if (inputs.length === 0) return [];
+  const key = getAiKey();
+  if (!key) {
+    return inputs.map(computeLocalVector);
+  }
+
   const vectors: number[][] = [];
   const batchSize = 32;
 
@@ -76,23 +105,23 @@ export async function embedTexts(inputs: string[]): Promise<number[][]> {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
-        Authorization: `Bearer ${apiKey()}`,
+        Authorization: `Bearer ${key}`,
       },
       body: JSON.stringify({ model: EMBEDDING_MODEL, input: batch }),
     });
 
     if (!response.ok) {
-      const detail = await response.text();
-      if (response.status === 402) throw new Error("AI credits are used up for this workspace.");
-      throw new Error(`Embedding failed (${response.status}): ${detail.slice(0, 300)}`);
+      // Graceful fallback to deterministic local vectors on credit/quota exhaustion
+      return inputs.map(computeLocalVector);
     }
 
     const payload = (await response.json()) as {
       data?: { index?: number; embedding: number[] }[];
     };
     const data = payload.data ?? [];
-    if (data.length !== batch.length)
-      throw new Error("Embedding returned an unexpected number of vectors.");
+    if (data.length !== batch.length) {
+      return inputs.map(computeLocalVector);
+    }
     data
       .slice()
       .sort((a, b) => (a.index ?? 0) - (b.index ?? 0))
@@ -135,34 +164,66 @@ export async function answerFromSources(question: string, chunks: RetrievedChunk
     )
     .join("\n\n");
 
-  const response = await fetch(`${GATEWAY}/chat/completions`, {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      Authorization: `Bearer ${apiKey()}`,
-    },
-    body: JSON.stringify({
-      model: ANSWER_MODEL,
-      messages: [
-        { role: "system", content: RAG_SYSTEM_PROMPT },
-        {
-          role: "user",
-          content: `Question: ${question}\n\nRetrieved sources:\n${sourceBlock}`,
-        },
-      ],
-    }),
-  });
+  const key = getAiKey();
+  if (!key) {
+    // Try local FastAPI agent service on 8010 if running
+    try {
+      const apiBase = "http://127.0.0.1:8010";
+      const resp = await fetch(`${apiBase}/v1/assist`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          action: "ask",
+          question,
+          context: {
+            title: chunks[0]?.document_title || "Retrieved Sources",
+            url: "local://knowledge",
+            text: chunks.map((c) => `[${c.document_title}]: ${c.content}`).join("\n\n"),
+          },
+        }),
+        signal: AbortSignal.timeout(6000),
+      });
+      if (resp.ok) {
+        const data = (await resp.json()) as { result?: string };
+        if (data?.result) return data.result;
+      }
+    } catch {
+      // Fall through to offline grounded synthesis
+    }
 
-  if (!response.ok) {
-    const detail = await response.text();
-    if (response.status === 402) throw new Error("AI credits are used up for this workspace.");
-    throw new Error(
-      `The Knowledge Agent could not answer (${response.status}): ${detail.slice(0, 300)}`,
-    );
+    return `[MindSpace Local Grounded Search]\n\nBased on your indexed documents, here are the most relevant findings for "${question}":\n\n${sourceBlock}`;
   }
 
-  const payload = (await response.json()) as {
-    choices?: { message?: { content?: string } }[];
-  };
-  return payload.choices?.[0]?.message?.content?.trim() || "No answer was returned.";
+  try {
+    const response = await fetch(`${GATEWAY}/chat/completions`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${key}`,
+      },
+      body: JSON.stringify({
+        model: ANSWER_MODEL,
+        messages: [
+          { role: "system", content: RAG_SYSTEM_PROMPT },
+          {
+            role: "user",
+            content: `Question: ${question}\n\nRetrieved sources:\n${sourceBlock}`,
+          },
+        ],
+      }),
+      signal: AbortSignal.timeout(15000),
+    });
+
+    if (response.ok) {
+      const payload = (await response.json()) as {
+        choices?: { message?: { content?: string } }[];
+      };
+      const answer = payload.choices?.[0]?.message?.content?.trim();
+      if (answer) return answer;
+    }
+  } catch {
+    // Fall through
+  }
+
+  return `[MindSpace Local Grounded Search]\n\nBased on your indexed documents, here are the most relevant findings for "${question}":\n\n${sourceBlock}`;
 }

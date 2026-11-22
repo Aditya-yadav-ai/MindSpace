@@ -1,4 +1,3 @@
-/* eslint-disable @typescript-eslint/no-explicit-any */
 /**
  * MindSpace Chrome Extension MV3 Type Definitions
  * Declares global 'chrome' namespace for browser extension contexts.
@@ -46,19 +45,19 @@ declare namespace chrome {
     export const onMessage: {
       addListener(
         callback: (
-          message: any,
+          message: unknown,
           sender: MessageSender,
-          sendResponse: (response?: any) => void,
-        ) => boolean | void | Promise<any>,
+          sendResponse: (response?: unknown) => void,
+        ) => boolean | void | Promise<unknown>,
       ): void;
       removeListener(
         callback: (
-          message: any,
+          message: unknown,
           sender: MessageSender,
-          sendResponse: (response?: any) => void,
-        ) => boolean | void | Promise<any>,
+          sendResponse: (response?: unknown) => void,
+        ) => boolean | void | Promise<unknown>,
       ): void;
-      hasListener(callback: (...args: any[]) => any): boolean;
+      hasListener(callback: (...args: unknown[]) => unknown): boolean;
     };
 
     export const onConnect: {
@@ -74,10 +73,10 @@ declare namespace chrome {
   export namespace storage {
     export interface StorageArea {
       get(
-        keys?: string | string[] | Record<string, any> | null,
-        callback?: (items: { [key: string]: any }) => void,
-      ): Promise<{ [key: string]: any }>;
-      set(items: { [key: string]: any }, callback?: () => void): Promise<void>;
+        keys?: string | string[] | Record<string, unknown> | null,
+        callback?: (items: { [key: string]: unknown }) => void,
+      ): Promise<{ [key: string]: unknown }>;
+      set(items: { [key: string]: unknown }, callback?: () => void): Promise<void>;
       remove(keys: string | string[], callback?: () => void): Promise<void>;
       clear(callback?: () => void): Promise<void>;
     }
@@ -89,13 +88,13 @@ declare namespace chrome {
     export const onChanged: {
       addListener(
         callback: (
-          changes: { [key: string]: { oldValue?: any; newValue?: any } },
+          changes: { [key: string]: { oldValue?: unknown; newValue?: unknown } },
           areaName: string,
         ) => void,
       ): void;
       removeListener(
         callback: (
-          changes: { [key: string]: { oldValue?: any; newValue?: any } },
+          changes: { [key: string]: { oldValue?: unknown; newValue?: unknown } },
           areaName: string,
         ) => void,
       ): void;

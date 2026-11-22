@@ -53,9 +53,17 @@ export function ConnectedAccountsView({
 
   React.useEffect(() => {
     if (!signedIn) return;
+    let active = true;
     void fetchStatus({})
-      .then(setConnectionStatus)
-      .catch(() => setConnectionStatus({ connected: false }));
+      .then((status) => {
+        if (active) setConnectionStatus(status);
+      })
+      .catch(() => {
+        if (active) setConnectionStatus({ connected: false });
+      });
+    return () => {
+      active = false;
+    };
   }, [signedIn, fetchStatus]);
 
   const isConnected = connectionStatus?.connected === true;

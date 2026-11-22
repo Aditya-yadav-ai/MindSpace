@@ -769,7 +769,7 @@ export function Workspace({
               view={view}
               wordCount={page.wordCount}
               hasContext={page.hasContent}
-              savedCount={savedPages.items.length}
+              savedCount={savedPages?.items?.length ?? 0}
               preview={user.preview}
             />
           )}

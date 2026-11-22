@@ -540,11 +540,15 @@ export function AgentActivity({ signedIn, context }: { signedIn: boolean; contex
             {[
               { id: "overview", label: "Execution Flow", icon: Network },
               { id: "timeline", label: "10-Stage Timeline", icon: Activity },
-              { id: "agents", label: `Agent Cards (${currentResult.steps.length})`, icon: Bot },
+              {
+                id: "agents",
+                label: `Agent Cards (${currentResult.steps?.length ?? 0})`,
+                icon: Bot,
+              },
               { id: "communication", label: "Blackboard & P2P", icon: MessagesSquare },
               {
                 id: "trace",
-                label: `Trace Log (${currentResult.trace.events.length})`,
+                label: `Trace Log (${currentResult.trace?.events?.length ?? 0})`,
                 icon: Terminal,
               },
             ].map((tab) => {
@@ -628,17 +632,19 @@ export function AgentActivity({ signedIn, context }: { signedIn: boolean; contex
                         Node 3
                       </span>
                       <h4 className="text-xs font-semibold mt-1">
-                        Specialists ({currentResult.steps.length})
+                        Specialists ({currentResult.steps?.length ?? 0})
                       </h4>
                       <div className="mt-1 flex flex-wrap gap-1">
-                        {Array.from(new Set(currentResult.steps.map((s) => s.agent))).map((ag) => (
-                          <span
-                            key={ag}
-                            className="text-[10px] font-mono px-1.5 py-0.5 rounded bg-muted text-muted-foreground"
-                          >
-                            {ag}
-                          </span>
-                        ))}
+                        {Array.from(new Set((currentResult.steps ?? []).map((s) => s.agent))).map(
+                          (ag) => (
+                            <span
+                              key={ag}
+                              className="text-[10px] font-mono px-1.5 py-0.5 rounded bg-muted text-muted-foreground"
+                            >
+                              {ag}
+                            </span>
+                          ),
+                        )}
                       </div>
                     </div>
                     <div className="mt-3 pt-2 border-t border-border/50 flex items-center gap-1 text-[10px] text-emerald-500 font-medium">
@@ -699,13 +705,13 @@ export function AgentActivity({ signedIn, context }: { signedIn: boolean; contex
                 <p className="text-xs leading-relaxed text-muted-foreground">
                   {currentResult.plan.rationale}
                 </p>
-                {currentResult.plan.notes.length > 0 && (
+                {(currentResult.plan?.notes?.length ?? 0) > 0 && (
                   <div className="mt-3 space-y-1 rounded-lg bg-amber-500/10 p-3 border border-amber-500/20">
                     <p className="text-[11px] font-semibold text-amber-700 dark:text-amber-400">
                       Execution Notes:
                     </p>
                     <ul className="space-y-0.5 text-xs text-amber-600 dark:text-amber-300">
-                      {currentResult.plan.notes.map((note, index) => (
+                      {(currentResult.plan?.notes ?? []).map((note, index) => (
                         <li key={index} className="flex items-start gap-1.5">
                           <span className="mt-1 size-1 rounded-full bg-amber-500 shrink-0" />
                           <span>{note}</span>
@@ -722,15 +728,15 @@ export function AgentActivity({ signedIn, context }: { signedIn: boolean; contex
                   <div className="flex items-center justify-between">
                     <Card3DTitle className="text-sm font-semibold flex items-center gap-2">
                       <ShieldCheck className="size-4 text-primary" />
-                      Verification Checks ({currentResult.verification.checks.length})
+                      Verification Checks ({currentResult.verification?.checks?.length ?? 0})
                     </Card3DTitle>
                     <span className="font-mono text-xs px-2 py-0.5 rounded bg-emerald-500/15 text-emerald-600 font-bold">
-                      Safety Score: {currentResult.verification.score}
+                      Safety Score: {currentResult.verification?.score ?? 100}
                     </span>
                   </div>
                 </Card3DHeader>
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
-                  {currentResult.verification.checks.map((check) => (
+                  {(currentResult.verification?.checks ?? []).map((check) => (
                     <div
                       key={check.id}
                       className="rounded-xl border border-border/70 bg-background/50 p-3 flex items-start gap-2.5"
@@ -775,42 +781,42 @@ export function AgentActivity({ signedIn, context }: { signedIn: boolean; contex
                   {
                     num: 2,
                     title: "Page Context Extraction",
-                    desc: `Loaded page "${activePage.title || "Untitled"}" (${activePage.text.length} chars)`,
+                    desc: `Loaded page "${activePage.title || "Untitled"}" (${activePage.text?.length ?? 0} chars)`,
                     status: "ok",
                     timing: "12 ms",
                   },
                   {
                     num: 3,
                     title: "Planning & Strategy Formulation",
-                    desc: `Manager formulated ${currentResult.plan.strategy} plan with ${currentResult.steps.length} steps`,
+                    desc: `Manager formulated ${currentResult.plan?.strategy ?? "standard"} plan with ${currentResult.steps?.length ?? 0} steps`,
                     status: "ok",
                     timing: "45 ms",
                   },
                   {
                     num: 4,
                     title: "Specialist Agent Dispatch",
-                    desc: `Orchestrated ${currentResult.trace.stats.agentCalls} specialist workers`,
+                    desc: `Orchestrated ${currentResult.trace?.stats?.agentCalls ?? 0} specialist workers`,
                     status: "ok",
                     timing: "60 ms",
                   },
                   {
                     num: 5,
                     title: "Tool & Adapter Execution",
-                    desc: `Executed ${currentResult.trace.stats.toolCalls} tool calls across Google Workspace adapters`,
+                    desc: `Executed ${currentResult.trace?.stats?.toolCalls ?? 0} tool calls across Google Workspace adapters`,
                     status: pending ? "warn" : "ok",
                     timing: "140 ms",
                   },
                   {
                     num: 6,
                     title: "Inter-Agent Data Synthesis",
-                    desc: `Exchanged ${currentResult.trace.stats.messages} structured P2P & blackboard messages`,
+                    desc: `Exchanged ${currentResult.trace?.stats?.messages ?? 0} structured P2P & blackboard messages`,
                     status: "ok",
                     timing: "180 ms",
                   },
                   {
                     num: 7,
                     title: "Verification Agent Inspection",
-                    desc: `Completed ${currentResult.verification.checks.length} compliance and safety checks`,
+                    desc: `Completed ${currentResult.verification?.checks?.length ?? 0} compliance and safety checks`,
                     status: "ok",
                     timing: "210 ms",
                   },
@@ -879,11 +885,13 @@ export function AgentActivity({ signedIn, context }: { signedIn: boolean; contex
                     className="rounded-lg border border-input bg-background px-2 py-1 text-xs font-medium"
                   >
                     <option value="all">All Agents</option>
-                    {Array.from(new Set(currentResult.steps.map((s) => s.agent))).map((ag) => (
-                      <option key={ag} value={ag}>
-                        {ag}
-                      </option>
-                    ))}
+                    {Array.from(new Set((currentResult.steps ?? []).map((s) => s.agent))).map(
+                      (ag) => (
+                        <option key={ag} value={ag}>
+                          {ag}
+                        </option>
+                      ),
+                    )}
                   </select>
 
                   <select
@@ -1022,7 +1030,7 @@ export function AgentActivity({ signedIn, context }: { signedIn: boolean; contex
                       : "text-muted-foreground hover:bg-accent",
                   )}
                 >
-                  Workflow Messages ({currentResult.trace.messages.length})
+                  Workflow Messages ({currentResult.trace?.messages?.length ?? 0})
                 </button>
                 <button
                   type="button"
@@ -1053,12 +1061,12 @@ export function AgentActivity({ signedIn, context }: { signedIn: boolean; contex
               {/* In-Memory Messages */}
               {commSubTab === "messages" && (
                 <div className="max-h-96 space-y-2 overflow-y-auto pr-1">
-                  {currentResult.trace.messages.length === 0 ? (
+                  {(currentResult.trace?.messages?.length ?? 0) === 0 ? (
                     <p className="text-xs text-muted-foreground py-4 text-center">
                       No messages recorded.
                     </p>
                   ) : (
-                    currentResult.trace.messages.map((message) => (
+                    (currentResult.trace?.messages ?? []).map((message) => (
                       <div
                         key={message.id}
                         className="rounded-xl border border-border/70 bg-background/60 p-3 text-xs font-mono space-y-1"

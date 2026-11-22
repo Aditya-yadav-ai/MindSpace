@@ -97,7 +97,7 @@ export function usePageContext() {
     if (typeof chrome !== "undefined" && chrome?.storage?.local) {
       chrome.storage.local.get(
         ["lastCapture", "lastScreenshotCapture"],
-        (items: Record<string, unknown>) => {
+        (items: { [key: string]: unknown }) => {
           if (chrome.runtime?.lastError) return;
           if (items["lastCapture"]) {
             const cap = items["lastCapture"] as Partial<PageContext>;

@@ -186,7 +186,7 @@ function RunsTab() {
             <LoaderCircle className="size-6 animate-spin text-primary mr-2" />
             <span className="text-xs">Loading execution history...</span>
           </div>
-        ) : runs.length === 0 ? (
+        ) : (runs?.length ?? 0) === 0 ? (
           <div className="rounded-xl border border-dashed border-border p-8 text-center space-y-2 bg-muted/20">
             <Clock3 className="mx-auto size-7 text-muted-foreground/60" />
             <p className="text-sm font-semibold text-foreground">No matching task runs found</p>
@@ -196,7 +196,7 @@ function RunsTab() {
             </p>
           </div>
         ) : (
-          runs.map((run) => (
+          (runs ?? []).map((run) => (
             <div
               key={run.id}
               className="rounded-xl border border-border bg-card p-4 space-y-3 transition-colors hover:border-primary/30"
@@ -454,7 +454,7 @@ function ChatTab() {
             <LoaderCircle className="size-6 animate-spin text-primary mr-2" />
             <span className="text-xs">Loading conversations...</span>
           </div>
-        ) : turns.length === 0 ? (
+        ) : (turns?.length ?? 0) === 0 ? (
           <div className="rounded-xl border border-dashed border-border p-8 text-center space-y-2 bg-muted/20">
             <p className="text-sm font-semibold text-foreground">No conversation turns recorded</p>
             <p className="text-xs text-muted-foreground">
@@ -462,7 +462,7 @@ function ChatTab() {
             </p>
           </div>
         ) : (
-          turns.map((turn) => (
+          (turns ?? []).map((turn) => (
             <div
               key={turn.id}
               className="flex items-start gap-3 rounded-xl border border-border bg-card p-3.5 transition-colors hover:border-primary/30"

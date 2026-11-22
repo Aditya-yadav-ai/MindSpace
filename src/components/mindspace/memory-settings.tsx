@@ -34,7 +34,7 @@ export function MemorySettings({ signedIn }: { signedIn: boolean }) {
 
   const refresh = useCallback(async () => {
     try {
-      setItems(await load({}));
+      setItems((await load({})) || []);
     } finally {
       setLoading(false);
     }
@@ -98,7 +98,7 @@ export function MemorySettings({ signedIn }: { signedIn: boolean }) {
             Notes you've saved for MindSpace to draw on later.
           </p>
         </div>
-        {items.some((item) => !item.pinned) && (
+        {(items ?? []).some((item) => !item.pinned) && (
           <Button
             variant="ghost"
             size="sm"
@@ -126,10 +126,10 @@ export function MemorySettings({ signedIn }: { signedIn: boolean }) {
       <div className="mt-3 space-y-1.5">
         {loading ? (
           <LoaderCircle className="size-3.5 animate-spin text-muted-foreground" />
-        ) : items.length === 0 ? (
+        ) : (items?.length ?? 0) === 0 ? (
           <p className="text-xs text-muted-foreground">Nothing saved yet.</p>
         ) : (
-          items.map((item) => (
+          (items ?? []).map((item) => (
             <div
               key={item.id}
               className="flex items-start gap-2 rounded-md bg-background p-2.5 text-xs ring-1 ring-border"

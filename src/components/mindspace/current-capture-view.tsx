@@ -50,7 +50,7 @@ export function CurrentCaptureView({
     if (typeof chrome !== "undefined" && chrome?.storage?.local) {
       chrome.storage.local.get(
         { lastScreenshotCapture: null },
-        (items: Record<string, unknown>) => {
+        (items: { [key: string]: unknown }) => {
           const sc = items["lastScreenshotCapture"] as { screenshot?: string } | undefined;
           if (sc?.screenshot) {
             setScreenshotUrl(sc.screenshot);

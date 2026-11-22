@@ -107,15 +107,12 @@ export const runAgentWorkflow = createServerFn({ method: "POST" })
     return result;
   });
 
-export type SerializableJson =
-  string | number | boolean | null | { [key: string]: SerializableJson } | SerializableJson[];
-
 export type MasBlackboardEvent = {
   id: number;
   run_id: string;
   event_type: string;
   agent_name: string;
-  details: Record<string, SerializableJson>;
+  details: Record<string, unknown>;
   created_at: string;
 };
 
@@ -126,7 +123,7 @@ export type MasP2PMessage = {
   sender: string;
   recipient: string;
   msg_type: string;
-  content: Record<string, SerializableJson>;
+  content: Record<string, unknown>;
   created_at: string;
   delivered_at: string | null;
   acknowledged: boolean;
@@ -143,7 +140,7 @@ export type MasActivityResponse = {
 };
 
 export const getMasActivityFeed = createServerFn({ method: "GET" })
-  .validator((input?: { runId?: string | undefined; limit?: number | undefined }) => ({
+  .validator((input: { runId?: string; limit?: number } | undefined) => ({
     runId: input?.runId,
     limit: input?.limit ?? 50,
   }))

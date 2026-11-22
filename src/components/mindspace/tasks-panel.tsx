@@ -32,7 +32,7 @@ export function TasksPanel({ signedIn }: { signedIn: boolean }) {
 
   const refresh = useCallback(async () => {
     try {
-      setTasks(await load({}));
+      setTasks((await load({})) || []);
       setError(null);
     } catch {
       setError("Your tasks could not be loaded. Please try again.");
@@ -105,8 +105,8 @@ export function TasksPanel({ signedIn }: { signedIn: boolean }) {
     }
   }
 
-  const pending = tasks.filter((task) => task.status === "pending");
-  const done = tasks.filter((task) => task.status === "done");
+  const pending = (tasks ?? []).filter((task) => task.status === "pending");
+  const done = (tasks ?? []).filter((task) => task.status === "done");
 
   return (
     <div className="mx-auto max-w-3xl">
@@ -152,7 +152,7 @@ export function TasksPanel({ signedIn }: { signedIn: boolean }) {
           onRemove={(t) => void remove_(t)}
           empty="Nothing pending — add one above, or ask the Reminder Agent in Agent Activity."
         />
-        {done.length > 0 && (
+        {(done?.length ?? 0) > 0 && (
           <TaskGroup
             title="Done"
             items={done}
@@ -190,17 +190,17 @@ function TaskGroup({
       <h2 className="text-sm font-semibold">
         {title}{" "}
         <span className="ml-1 font-mono text-[11px] font-normal text-muted-foreground">
-          {items.length}
+          {items?.length ?? 0}
         </span>
       </h2>
       <div className="mt-3">
         {loading ? (
           <LoaderCircle className="size-4 animate-spin text-muted-foreground" />
-        ) : items.length === 0 ? (
+        ) : (items?.length ?? 0) === 0 ? (
           <p className="text-xs leading-5 text-muted-foreground">{empty}</p>
         ) : (
           <ul className="space-y-1.5">
-            {items.map((task) => (
+            {(items ?? []).map((task) => (
               <li
                 key={task.id}
                 className="flex items-center gap-2.5 rounded-md bg-background p-2.5 ring-1 ring-border"

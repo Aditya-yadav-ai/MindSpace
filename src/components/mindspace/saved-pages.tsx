@@ -32,7 +32,7 @@ export function SavedPages({
           <LoaderCircle className="size-3.5 animate-spin" aria-hidden="true" />
           Loading saved pages…
         </p>
-      ) : items.length === 0 ? (
+      ) : (items?.length ?? 0) === 0 ? (
         <div className="surface-card mt-6 grid place-items-center p-10 text-center">
           <div>
             <span className="mx-auto grid size-10 place-items-center rounded-xl bg-accent text-accent-foreground">
@@ -48,7 +48,7 @@ export function SavedPages({
       ) : (
         <>
           <ul className="mt-5 space-y-2">
-            {items.map((item) => (
+            {(items ?? []).map((item) => (
               <li key={item.id} className="surface-card flex items-start gap-3 p-3.5">
                 <span className="mt-0.5 grid size-8 shrink-0 place-items-center rounded-lg bg-accent text-accent-foreground">
                   <Bookmark className="size-3.5" aria-hidden="true" />

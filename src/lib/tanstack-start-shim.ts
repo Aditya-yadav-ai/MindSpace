@@ -4,6 +4,8 @@
  * Implements createServerFn, useServerFn, and createMiddleware so components
  * can run client-side without requiring a Node.js SSR runtime.
  */
+import { useCallback } from "react";
+import { supabase } from "@/integrations/supabase/client";
 
 export function createServerFn(options?: Record<string, unknown>) {
   let registeredHandler:
@@ -14,7 +16,10 @@ export function createServerFn(options?: Record<string, unknown>) {
       try {
         const inputData =
           payload && typeof payload === "object" && "data" in payload ? payload.data : payload;
-        return await registeredHandler({ data: inputData, context: { userId: "local-user" } });
+        return await registeredHandler({
+          data: inputData,
+          context: { userId: "local-user", supabase },
+        });
       } catch (err) {
         console.warn("[Extension client] serverFn execution failed:", err);
         return null;
@@ -43,12 +48,15 @@ export function createMiddleware() {
 }
 
 export function useServerFn(serverFn: any) {
-  return async (args?: any) => {
-    if (typeof serverFn === "function") {
-      return serverFn(args);
-    }
-    return null;
-  };
+  return useCallback(
+    async (args?: any) => {
+      if (typeof serverFn === "function") {
+        return serverFn(args);
+      }
+      return null;
+    },
+    [serverFn],
+  );
 }
 
 export function createStart() {

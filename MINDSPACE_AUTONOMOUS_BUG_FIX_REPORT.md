@@ -15,6 +15,7 @@ This autonomous audit and repair engagement performed a comprehensive, root-caus
 All identified syntax, type system, runtime, and security boundary defects were resolved directly in original source files without weakening assertions, bypassing authentication gates, or substituting production logic with mocks.
 
 ### Key Milestones Achieved:
+
 1. **TypeScript Strict Type Check:** Reduced **95 compilation errors** across 27 files under strict compiler flags (`exactOptionalPropertyTypes`, `noUncheckedIndexedAccess`, `noImplicitReturns`, `noPropertyAccessFromIndexSignature`) to **0 errors**.
 2. **ESLint Code Quality Audit:** Cleaned all lint errors to **0 errors** across the codebase (with only 14 template UI fast-refresh notices remaining).
 3. **Frontend & Extension Test Suite:** **47 passed, 0 failed** across 4 test runners:
@@ -29,22 +30,23 @@ All identified syntax, type system, runtime, and security boundary defects were 
 
 ## 2. Quantitative Audit & Test Matrix
 
-| Subsystem / Test Suite | Target Runner / Tool | Baseline / Before | After Hardening | Status |
-| :--- | :--- | :--- | :--- | :--- |
-| **TypeScript Strict Checking** | `npx tsc --noEmit` | 95 errors (27 files) | **0 errors (0 warnings)** | **PASSED** |
-| **ESLint Quality & Style** | `npm run lint` | 77 problems (63 errors) | **0 errors (14 fast-refresh warnings)** | **PASSED** |
-| **Authentication & Linking** | `npm run test:auth` | 13 passed | **13 passed, 0 failed** | **PASSED** |
-| **PDF Extraction & Fonts** | `npm run test:pdf` | 4 passed | **4 passed, 0 failed** | **PASSED** |
-| **Google Services & Crypto** | `npm run test:google` | 19 passed | **19 passed, 0 failed** | **PASSED** |
-| **Extension & Chrome Browser** | `npm run test:extension` | 11 passed | **11 passed, 0 failed** | **PASSED** |
-| **Python Backend & MAS** | `pytest apps/api/tests` | 23 collection errors | **294 passed, 0 failed** | **PASSED** |
-| **Production Build & Dist** | `npm run build:all` | Stale bundle / warnings | **10 / 10 checklist items verified** | **PASSED** |
+| Subsystem / Test Suite         | Target Runner / Tool     | Baseline / Before       | After Hardening                         | Status     |
+| :----------------------------- | :----------------------- | :---------------------- | :-------------------------------------- | :--------- |
+| **TypeScript Strict Checking** | `npx tsc --noEmit`       | 95 errors (27 files)    | **0 errors (0 warnings)**               | **PASSED** |
+| **ESLint Quality & Style**     | `npm run lint`           | 77 problems (63 errors) | **0 errors (14 fast-refresh warnings)** | **PASSED** |
+| **Authentication & Linking**   | `npm run test:auth`      | 13 passed               | **13 passed, 0 failed**                 | **PASSED** |
+| **PDF Extraction & Fonts**     | `npm run test:pdf`       | 4 passed                | **4 passed, 0 failed**                  | **PASSED** |
+| **Google Services & Crypto**   | `npm run test:google`    | 19 passed               | **19 passed, 0 failed**                 | **PASSED** |
+| **Extension & Chrome Browser** | `npm run test:extension` | 11 passed               | **11 passed, 0 failed**                 | **PASSED** |
+| **Python Backend & MAS**       | `pytest apps/api/tests`  | 23 collection errors    | **294 passed, 0 failed**                | **PASSED** |
+| **Production Build & Dist**    | `npm run build:all`      | Stale bundle / warnings | **10 / 10 checklist items verified**    | **PASSED** |
 
 ---
 
 ## 3. Subsystem Bug Fixes & Technical Root Causes
 
 ### 3.1. TypeScript Strict Type Soundness (`exactOptionalPropertyTypes` & `noUncheckedIndexedAccess`)
+
 - **Root Cause:** With TypeScript's `exactOptionalPropertyTypes: true` enabled in `tsconfig.json`, properties defined as optional `prop?: string` cannot receive `{ prop: undefined }` explicitly. Additionally, `noUncheckedIndexedAccess: true` yields `T | undefined` for array indexing (`arr[0]`) and object key lookups (`obj[key]`), causing 95 compilation errors.
 - **Remediations:**
   1. `src/types/chrome.d.ts`: Created full Chrome MV3 typing definitions (`chrome.runtime`, `chrome.storage`, `chrome.tabs`, `chrome.sidePanel`, `chrome.action`, `chrome.identity`, `chrome.commands`, `chrome.windows`) supporting async and callback styles.
@@ -59,18 +61,21 @@ All identified syntax, type system, runtime, and security boundary defects were 
   7. `src/routes/index.tsx`: Bound `name={user.name}` on `<OverviewView />` and removed obsolete props from `<CurrentCaptureView />`.
 
 ### 3.2. Pytest Runner & Module Resolution Configuration
+
 - **Root Cause:** When running pytest from repository root without explicit `pythonpath`, Python 3.12 raised `ModuleNotFoundError: No module named 'mas'` and `'app'` during test discovery.
 - **Remediations:**
   - Configured `apps/api/pytest.ini` with `pythonpath = . apps/api`, `asyncio_mode = strict`, and `asyncio_default_fixture_loop_scope = function`.
   - Executed all 294 tests across 23 modules with zero warnings and 100% pass rate.
 
 ### 3.3. ESLint Code Formatting & Cleanliness
+
 - **Root Cause:** Prettier code style discrepancies and explicit `any` usages in storage callbacks (`items: { [key: string]: any }`) caused 63 ESLint errors.
 - **Remediations:**
   - Standardized callback signatures with `Record<string, unknown>` in `current-capture-view.tsx` and `page-context.ts`.
   - Applied formatting rules to resolve all 63 lint errors, reaching zero errors.
 
 ### 3.4. Chrome MV3 Extension Packaging (`dist-extension`)
+
 - **Root Cause:** Extension builds require strict Manifest V3 separation without external runtime node dependencies, preserving standard fonts (`standard_fonts/`) and CMaps (`cmaps/`) for in-browser PDF extraction.
 - **Remediations:**
   - Validated `scripts/build-extension.mjs` and verified that Vite bundles client assets into `dist-extension/assets` while copying all static font assets, background worker scripts, and icons.
@@ -81,12 +86,14 @@ All identified syntax, type system, runtime, and security boundary defects were 
 ## 4. Verification Test Output Evidence
 
 ### 4.1. TypeScript Compiler Check
+
 ```powershell
 $ npx tsc --noEmit
 # Exit Code 0 - No errors
 ```
 
 ### 4.2. ESLint Quality Check
+
 ```powershell
 $ npm run lint
 > eslint .
@@ -95,6 +102,7 @@ $ npm run lint
 ```
 
 ### 4.3. Node.js Full Test Suite (`npm run test:all`)
+
 ```text
 > test:all
 > npm run test:auth && npm run test:pdf && npm run test:google && npm run test:extension
@@ -143,6 +151,7 @@ $ npm run lint
 ```
 
 ### 4.4. Pytest Backend Suite (`pytest apps/api/tests`)
+
 ```text
 ============================= test session starts =============================
 platform win32 -- Python 3.12.13, pytest-9.2.0, pluggy-1.7.0
@@ -179,6 +188,7 @@ apps\api\tests\test_zero_dependency_enhancements.py .....                [100%]
 ```
 
 ### 4.5. Production Build Verification (`npm run build:all`)
+
 ```text
 --- Verification Checklist ---
 ✔ PASS: Manifest V3 file exists (manifest.json)
