@@ -591,20 +591,34 @@ export function saveLocalGoogleConnection(
 
 export function getLocalGoogleConnection(userId: string) {
   const db = getDb();
-  return db
+  type ConnRow = {
+    google_email: string;
+    scope: string;
+    encrypted_access_token: string;
+    encrypted_refresh_token: string;
+    access_token_expires_at: string;
+    created_at: string;
+  };
+  const direct = db
     .prepare(
       "SELECT google_email, scope, encrypted_access_token, encrypted_refresh_token, access_token_expires_at, created_at FROM local_google_connections WHERE user_id = ?",
     )
-    .get(userId) as
-    | {
-        google_email: string;
-        scope: string;
-        encrypted_access_token: string;
-        encrypted_refresh_token: string;
-        access_token_expires_at: string;
-        created_at: string;
-      }
-    | undefined;
+    .get(userId) as ConnRow | undefined;
+  if (direct) return direct;
+
+  const byEmail = db
+    .prepare(
+      "SELECT google_email, scope, encrypted_access_token, encrypted_refresh_token, access_token_expires_at, created_at FROM local_google_connections WHERE google_email = ?",
+    )
+    .get(userId) as ConnRow | undefined;
+  if (byEmail) return byEmail;
+
+  const anyConn = db
+    .prepare(
+      "SELECT google_email, scope, encrypted_access_token, encrypted_refresh_token, access_token_expires_at, created_at FROM local_google_connections ORDER BY updated_at DESC LIMIT 1",
+    )
+    .get() as ConnRow | undefined;
+  return anyConn || undefined;
 }
 
 export function deleteLocalGoogleConnection(userId: string): void {

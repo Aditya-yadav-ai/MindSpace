@@ -6,6 +6,7 @@
  */
 import { useCallback } from "react";
 import { supabase } from "@/integrations/supabase/client";
+import { getClientSession } from "@/lib/auth-client";
 
 export function createServerFn(options?: Record<string, unknown>) {
   let registeredHandler:
@@ -16,9 +17,12 @@ export function createServerFn(options?: Record<string, unknown>) {
       try {
         const inputData =
           payload && typeof payload === "object" && "data" in payload ? payload.data : payload;
+        const session = getClientSession();
+        const userId = session?.user?.id || session?.user?.email || "local-user";
+        const email = session?.user?.email || "";
         return await registeredHandler({
           data: inputData,
-          context: { userId: "local-user", supabase },
+          context: { userId, email, supabase },
         });
       } catch (err) {
         console.warn("[Extension client] serverFn execution failed:", err);

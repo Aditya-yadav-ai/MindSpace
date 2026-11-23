@@ -32,19 +32,41 @@ export const GOOGLE_SCOPES = [
 const AUTH_URL = "https://accounts.google.com/o/oauth2/v2/auth";
 
 export async function createAuthorizationUrl(
-  _userId: string,
+  userId: string,
   scopes?: string[],
-  _userEmail?: string,
+  userEmail?: string,
 ): Promise<string> {
+  // 1. Primary: Request a real PKCE-backed Google consent URL from the local server
+  try {
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), 2000);
+    const params = new URLSearchParams({
+      action: "url",
+      userId: userId || "local-user",
+      email: userEmail || "",
+    });
+    if (scopes && scopes.length > 0) {
+      params.set("scopes", scopes.join(","));
+    }
+    const res = await fetch(`http://localhost:8080/api/google/oauth-callback?${params.toString()}`, {
+      signal: controller.signal,
+    });
+    clearTimeout(timer);
+    if (res.ok) {
+      const data = await res.json();
+      if (data?.url) return data.url;
+    }
+  } catch {
+    // Local server not available; fall back to client construction
+  }
+
+  // 2. Secondary fallback: Construct client-side authorization URL with configured environment variables
   const clientId =
     (typeof process !== "undefined" && process.env?.["GOOGLE_CLIENT_ID"]) ||
-    "mindspace-extension-client-id";
+    "";
   const redirectUri =
-    (typeof chrome !== "undefined" &&
-      typeof chrome.identity?.getRedirectURL === "function" &&
-      chrome.identity.getRedirectURL()) ||
-    (typeof window !== "undefined" && `${window.location.origin}/api/google/oauth-callback`) ||
-    "http://127.0.0.1:8010/api/google/oauth-callback";
+    (typeof process !== "undefined" && process.env?.["GOOGLE_REDIRECT_URI"]) ||
+    "http://localhost:8080/api/google/oauth-callback";
 
   const requestedScopes = Array.from(new Set([...GOOGLE_SCOPES, ...(scopes || [])])).join(" ");
   const state = Math.random().toString(36).substring(2);
@@ -62,11 +84,71 @@ export async function createAuthorizationUrl(
   return `${AUTH_URL}?${params.toString()}`;
 }
 
-export async function getConnectionStatus(_userId: string): Promise<GoogleConnectionStatus> {
+export async function getConnectionStatus(userId: string): Promise<GoogleConnectionStatus> {
+  // 1. Primary: Query the server on port 8080 for live SQLite/Supabase status
+  try {
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), 2000);
+    const res = await fetch(
+      `http://localhost:8080/api/google/oauth-callback?action=status&userId=${encodeURIComponent(userId || "local-user")}`,
+      { signal: controller.signal },
+    );
+    clearTimeout(timer);
+    if (res.ok) {
+      const data = (await res.json()) as GoogleConnectionStatus;
+      if (data && data.connected) {
+        // Cache in localStorage and chrome.storage.local for instantaneous offline access
+        if (typeof localStorage !== "undefined") {
+          try {
+            const raw = localStorage.getItem("mindspace.auth.google_conn.v1") || "{}";
+            const conns = JSON.parse(raw);
+            conns[userId] = {
+              googleEmail: data.googleEmail,
+              scopes: data.scope,
+              updatedAt: data.connectedAt || new Date().toISOString(),
+            };
+            conns["local-user"] = conns[userId];
+            localStorage.setItem("mindspace.auth.google_conn.v1", JSON.stringify(conns));
+          } catch {
+            /* ignore */
+          }
+        }
+        if (typeof chrome !== "undefined" && typeof chrome.storage?.local?.set === "function") {
+          try {
+            await chrome.storage.local.set({
+              "mindspace.auth.google_conn.v1": {
+                [userId]: {
+                  googleEmail: data.googleEmail,
+                  scopes: data.scope,
+                  updatedAt: data.connectedAt || new Date().toISOString(),
+                },
+                "local-user": {
+                  googleEmail: data.googleEmail,
+                  scopes: data.scope,
+                  updatedAt: data.connectedAt || new Date().toISOString(),
+                },
+              },
+            });
+          } catch {
+            /* ignore */
+          }
+        }
+        return data;
+      }
+    }
+  } catch {
+    // Server not available
+  }
+
+  // 2. Secondary fallback: Check localStorage
   if (typeof localStorage !== "undefined") {
     try {
       const connections = JSON.parse(localStorage.getItem("mindspace.auth.google_conn.v1") || "{}");
-      const conn = connections[_userId];
+      const conn = (connections[userId] ||
+        connections["local-user"] ||
+        Object.values(connections)[0]) as
+        | { googleEmail?: string; scopes?: string[] | string; updatedAt?: string }
+        | undefined;
       if (conn && conn.googleEmail) {
         return {
           connected: true,
@@ -80,17 +162,56 @@ export async function getConnectionStatus(_userId: string): Promise<GoogleConnec
       /* ignore storage read error */
     }
   }
+
+  // 3. Tertiary fallback: Check chrome.storage.local
+  if (typeof chrome !== "undefined" && typeof chrome.storage?.local?.get === "function") {
+    try {
+      const stored = await chrome.storage.local.get(["mindspace.auth.google_conn.v1"]);
+      const connections = (stored && (stored["mindspace.auth.google_conn.v1"] as Record<string, unknown>)) || {};
+      const conn = (connections[userId] ||
+        connections["local-user"] ||
+        Object.values(connections)[0]) as
+        | { googleEmail?: string; scopes?: string[] | string; updatedAt?: string }
+        | undefined;
+      if (conn && conn.googleEmail) {
+        return {
+          connected: true,
+          googleEmail: conn.googleEmail,
+          scope: typeof conn.scopes === "string" ? conn.scopes.split(" ") : conn.scopes || [],
+          connectedAt: conn.updatedAt || new Date().toISOString(),
+          expiresSoon: false,
+        };
+      }
+    } catch {
+      /* ignore */
+    }
+  }
+
   return { connected: false };
 }
 
-export async function disconnectGoogle(_userId: string): Promise<void> {
+export async function disconnectGoogle(userId: string): Promise<void> {
+  try {
+    await fetch(
+      `http://localhost:8080/api/google/oauth-callback?action=disconnect&userId=${encodeURIComponent(userId || "local-user")}`,
+      { method: "GET" },
+    );
+  } catch {
+    /* ignore */
+  }
+
   if (typeof localStorage !== "undefined") {
     try {
-      const connections = JSON.parse(localStorage.getItem("mindspace.auth.google_conn.v1") || "{}");
-      delete connections[_userId];
-      localStorage.setItem("mindspace.auth.google_conn.v1", JSON.stringify(connections));
+      localStorage.removeItem("mindspace.auth.google_conn.v1");
     } catch {
       /* ignore storage write error */
+    }
+  }
+  if (typeof chrome !== "undefined" && typeof chrome.storage?.local?.remove === "function") {
+    try {
+      await chrome.storage.local.remove(["mindspace.auth.google_conn.v1"]);
+    } catch {
+      /* ignore */
     }
   }
 }

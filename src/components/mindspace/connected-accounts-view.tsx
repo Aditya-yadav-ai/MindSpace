@@ -54,15 +54,24 @@ export function ConnectedAccountsView({
   React.useEffect(() => {
     if (!signedIn) return;
     let active = true;
-    void fetchStatus({})
-      .then((status) => {
-        if (active) setConnectionStatus(status);
-      })
-      .catch(() => {
-        if (active) setConnectionStatus({ connected: false });
-      });
+    const refresh = () => {
+      void fetchStatus({})
+        .then((status) => {
+          if (active) setConnectionStatus(status);
+        })
+        .catch(() => {
+          if (active) setConnectionStatus({ connected: false });
+        });
+    };
+    refresh();
+
+    window.addEventListener("focus", refresh);
+    document.addEventListener("visibilitychange", refresh);
+
     return () => {
       active = false;
+      window.removeEventListener("focus", refresh);
+      document.removeEventListener("visibilitychange", refresh);
     };
   }, [signedIn, fetchStatus]);
 
@@ -76,11 +85,16 @@ export function ConnectedAccountsView({
         s.startsWith("https://") ? s : `https://www.googleapis.com/auth/${s}`,
       );
       const { url } = await fetchAuthUrl({ data: { scopes: fullScopes } });
-      window.location.href = url;
+      if (typeof chrome !== "undefined" && chrome.tabs && typeof chrome.tabs.create === "function") {
+        chrome.tabs.create({ url });
+      } else {
+        window.open(url, "_blank");
+      }
     } catch (err) {
       setServiceError(
         err instanceof Error ? err.message : `Failed to initiate authorization for ${serviceId}`,
       );
+    } finally {
       setLoadingService(null);
     }
   };

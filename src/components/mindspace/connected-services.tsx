@@ -59,9 +59,19 @@ export function ConnectedServices({
     if (!signedIn) return;
     setNotice(readGoogleNotice());
     clearGoogleNotice();
-    void fetchStatus({})
-      .then(setStatus)
-      .catch(() => setStatus({ connected: false }));
+    const refresh = () => {
+      void fetchStatus({})
+        .then(setStatus)
+        .catch(() => setStatus({ connected: false }));
+    };
+    refresh();
+
+    window.addEventListener("focus", refresh);
+    document.addEventListener("visibilitychange", refresh);
+    return () => {
+      window.removeEventListener("focus", refresh);
+      document.removeEventListener("visibilitychange", refresh);
+    };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [signedIn]);
 
@@ -72,9 +82,14 @@ export function ConnectedServices({
     setError(null);
     try {
       const { url } = await fetchAuthUrl({});
-      window.location.href = url;
+      if (typeof chrome !== "undefined" && chrome.tabs && typeof chrome.tabs.create === "function") {
+        chrome.tabs.create({ url });
+      } else {
+        window.open(url, "_blank");
+      }
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : "Could not start Google Sign-In.");
+    } finally {
       setLoading(false);
     }
   }
