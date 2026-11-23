@@ -220,9 +220,16 @@ function Chat({
     };
   }, [command, send, busy]);
 
+  const onBusyChangeRef = useRef(onBusyChange);
+  onBusyChangeRef.current = onBusyChange;
+  const lastBusyRef = useRef<boolean | null>(null);
+
   useEffect(() => {
-    onBusyChange?.(busy);
-  }, [busy, onBusyChange]);
+    if (lastBusyRef.current !== busy) {
+      lastBusyRef.current = busy;
+      onBusyChangeRef.current?.(busy);
+    }
+  }, [busy]);
 
   const searchQuery =
     contextRef.current.title.trim() || contextRef.current.selection.trim().slice(0, 120);

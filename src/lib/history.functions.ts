@@ -40,17 +40,19 @@ export const listAgentRuns = createServerFn({ method: "GET" })
   .inputValidator((input: unknown) => ListAgentRunsInput.parse(input ?? {}))
   .handler(async ({ data, context }): Promise<AgentRunSummary[]> => {
     try {
-      let query = context.supabase
-        .from("agent_runs")
-        .select(
-          "id,goal,status,answer,verification_verdict,verification_score,step_count,failed_count,automation_id,created_at",
-        )
-        .order("created_at", { ascending: false })
-        .limit(data.limit);
-      if (data.status !== "all") query = query.eq("status", data.status);
-      if (data.search) query = query.ilike("goal", `%${data.search}%`);
-      const { data: rows, error } = await query;
-      if (!error && rows) return rows as AgentRunSummary[];
+      if (context?.supabase && typeof context.supabase.from === "function") {
+        let query = context.supabase
+          .from("agent_runs")
+          .select(
+            "id,goal,status,answer,verification_verdict,verification_score,step_count,failed_count,automation_id,created_at",
+          )
+          .order("created_at", { ascending: false })
+          .limit(data.limit);
+        if (data.status !== "all") query = query.eq("status", data.status);
+        if (data.search) query = query.ilike("goal", `%${data.search}%`);
+        const { data: rows, error } = await query;
+        if (!error && rows && rows.length > 0) return rows as AgentRunSummary[];
+      }
     } catch {
       // Supabase unavailable; fall through to local SQLite
     }
@@ -63,12 +65,14 @@ export const getAgentRun = createServerFn({ method: "GET" })
   .inputValidator((input: unknown) => z.object({ runId: z.string().min(1) }).parse(input))
   .handler(async ({ data, context }): Promise<AgentRunDetail | null> => {
     try {
-      const { data: row, error } = await context.supabase
-        .from("agent_runs")
-        .select("*")
-        .eq("id", data.runId)
-        .maybeSingle();
-      if (!error && row) return row as unknown as AgentRunDetail;
+      if (context?.supabase && typeof context.supabase.from === "function") {
+        const { data: row, error } = await context.supabase
+          .from("agent_runs")
+          .select("*")
+          .eq("id", data.runId)
+          .maybeSingle();
+        if (!error && row) return row as unknown as AgentRunDetail;
+      }
     } catch {
       // Supabase unavailable; fall through to local SQLite
     }
@@ -81,8 +85,14 @@ export const deleteAgentRun = createServerFn({ method: "POST" })
   .inputValidator((input: unknown) => z.object({ runId: z.string().min(1) }).parse(input))
   .handler(async ({ data, context }): Promise<{ ok: true }> => {
     try {
-      const { error } = await context.supabase.from("agent_runs").delete().eq("id", data.runId);
-      if (!error) return { ok: true };
+      if (context?.supabase && typeof context.supabase.from === "function") {
+        const { error } = await context.supabase.from("agent_runs").delete().eq("id", data.runId);
+        if (!error) {
+          const { deleteLocalAgentRun } = await import("@/lib/local-db.server");
+          deleteLocalAgentRun(data.runId);
+          return { ok: true };
+        }
+      }
     } catch {
       // Supabase unavailable; fall through to local SQLite
     }
@@ -117,14 +127,16 @@ export const recordChatTurn = createServerFn({ method: "POST" })
   .inputValidator((input: unknown) => RecordChatTurnInput.parse(input))
   .handler(async ({ data, context }): Promise<{ ok: true }> => {
     try {
-      const { error } = await context.supabase.from("chat_turns").insert({
-        user_id: context.userId,
-        role: data.role,
-        content: data.content,
-        page_title: data.pageTitle,
-        page_url: data.pageUrl,
-      });
-      if (!error) return { ok: true };
+      if (context?.supabase && typeof context.supabase.from === "function") {
+        const { error } = await context.supabase.from("chat_turns").insert({
+          user_id: context.userId,
+          role: data.role,
+          content: data.content,
+          page_title: data.pageTitle,
+          page_url: data.pageUrl,
+        });
+        if (!error) return { ok: true };
+      }
     } catch {
       // Supabase unavailable; fall through to local SQLite
     }
@@ -148,14 +160,16 @@ export const listChatHistory = createServerFn({ method: "GET" })
   .inputValidator((input: unknown) => ListChatHistoryInput.parse(input ?? {}))
   .handler(async ({ data, context }): Promise<ChatTurnRecord[]> => {
     try {
-      let query = context.supabase
-        .from("chat_turns")
-        .select("id,role,content,page_title,page_url,created_at")
-        .order("created_at", { ascending: false })
-        .limit(data.limit);
-      if (data.search) query = query.ilike("content", `%${data.search}%`);
-      const { data: rows, error } = await query;
-      if (!error && rows) return rows as ChatTurnRecord[];
+      if (context?.supabase && typeof context.supabase.from === "function") {
+        let query = context.supabase
+          .from("chat_turns")
+          .select("id,role,content,page_title,page_url,created_at")
+          .order("created_at", { ascending: false })
+          .limit(data.limit);
+        if (data.search) query = query.ilike("content", `%${data.search}%`);
+        const { data: rows, error } = await query;
+        if (!error && rows && rows.length > 0) return rows as ChatTurnRecord[];
+      }
     } catch {
       // Supabase unavailable; fall through to local SQLite
     }
@@ -168,8 +182,14 @@ export const deleteChatTurn = createServerFn({ method: "POST" })
   .inputValidator((input: unknown) => z.object({ turnId: z.string().uuid() }).parse(input))
   .handler(async ({ data, context }): Promise<{ ok: true }> => {
     try {
-      const { error } = await context.supabase.from("chat_turns").delete().eq("id", data.turnId);
-      if (!error) return { ok: true };
+      if (context?.supabase && typeof context.supabase.from === "function") {
+        const { error } = await context.supabase.from("chat_turns").delete().eq("id", data.turnId);
+        if (!error) {
+          const { deleteLocalChatTurn } = await import("@/lib/local-db.server");
+          deleteLocalChatTurn(data.turnId);
+          return { ok: true };
+        }
+      }
     } catch {
       // Supabase unavailable; fall through to local SQLite
     }
@@ -182,11 +202,17 @@ export const clearChatHistory = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .handler(async ({ context }): Promise<{ ok: true }> => {
     try {
-      const { error } = await context.supabase
-        .from("chat_turns")
-        .delete()
-        .eq("user_id", context.userId);
-      if (!error) return { ok: true };
+      if (context?.supabase && typeof context.supabase.from === "function") {
+        const { error } = await context.supabase
+          .from("chat_turns")
+          .delete()
+          .eq("user_id", context.userId);
+        if (!error) {
+          const { clearLocalChatTurns } = await import("@/lib/local-db.server");
+          clearLocalChatTurns(context.userId);
+          return { ok: true };
+        }
+      }
     } catch {
       // Supabase unavailable; fall through to local SQLite
     }

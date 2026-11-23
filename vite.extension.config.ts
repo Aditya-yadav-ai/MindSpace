@@ -38,6 +38,8 @@ export default defineConfig({
       "@/lib/history.server": path.resolve(__dirname, "./src/lib/google/oauth.browser-shim.ts"),
       "@/lib/local-db.server": path.resolve(__dirname, "./src/lib/local-db.browser-shim.ts"),
       "@/lib/rag.server": path.resolve(__dirname, "./src/lib/rag.browser-shim.ts"),
+      "./local-db.server": path.resolve(__dirname, "./src/lib/local-db.browser-shim.ts"),
+      "./rag.server": path.resolve(__dirname, "./src/lib/rag.browser-shim.ts"),
       "node:url": path.resolve(__dirname, "./src/lib/node-empty-shim.ts"),
       "node:fs": path.resolve(__dirname, "./src/lib/node-empty-shim.ts"),
       "node:path": path.resolve(__dirname, "./src/lib/node-empty-shim.ts"),

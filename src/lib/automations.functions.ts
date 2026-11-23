@@ -61,13 +61,15 @@ export const listAutomations = createServerFn({ method: "GET" })
   .middleware([requireSupabaseAuth])
   .handler(async ({ context }): Promise<AutomationRecord[]> => {
     try {
-      const { data, error } = await context.supabase
-        .from("automations")
-        .select(
-          "id,name,goal,schedule_kind,schedule_hour,schedule_day_of_week,approved_tools,enabled,last_run_at,next_run_at,created_at",
-        )
-        .order("created_at", { ascending: false });
-      if (!error && data) return data as AutomationRecord[];
+      if (context?.supabase && typeof context.supabase.from === "function") {
+        const { data, error } = await context.supabase
+          .from("automations")
+          .select(
+            "id,name,goal,schedule_kind,schedule_hour,schedule_day_of_week,approved_tools,enabled,last_run_at,next_run_at,created_at",
+          )
+          .order("created_at", { ascending: false });
+        if (!error && data && data.length > 0) return data as AutomationRecord[];
+      }
     } catch {
       // Supabase unavailable; fall through to local SQLite
     }
@@ -85,23 +87,37 @@ export const createAutomation = createServerFn({ method: "POST" })
       dayOfWeek: data.scheduleDayOfWeek,
     });
     try {
-      const { data: inserted, error } = await context.supabase
-        .from("automations")
-        .insert({
-          user_id: context.userId,
-          name: data.name,
-          goal: data.goal,
-          schedule_kind: data.scheduleKind,
-          schedule_hour: data.scheduleHour,
-          schedule_day_of_week: data.scheduleDayOfWeek,
-          approved_tools: data.approvedTools,
-          next_run_at: nextRunAt.toISOString(),
-        })
-        .select(
-          "id,name,goal,schedule_kind,schedule_hour,schedule_day_of_week,approved_tools,enabled,last_run_at,next_run_at,created_at",
-        )
-        .single();
-      if (!error && inserted) return inserted as AutomationRecord;
+      if (context?.supabase && typeof context.supabase.from === "function") {
+        const { data: inserted, error } = await context.supabase
+          .from("automations")
+          .insert({
+            user_id: context.userId,
+            name: data.name,
+            goal: data.goal,
+            schedule_kind: data.scheduleKind,
+            schedule_hour: data.scheduleHour,
+            schedule_day_of_week: data.scheduleDayOfWeek,
+            approved_tools: data.approvedTools,
+            next_run_at: nextRunAt.toISOString(),
+          })
+          .select(
+            "id,name,goal,schedule_kind,schedule_hour,schedule_day_of_week,approved_tools,enabled,last_run_at,next_run_at,created_at",
+          )
+          .single();
+        if (!error && inserted) {
+          const { createLocalAutomation } = await import("@/lib/local-db.server");
+          createLocalAutomation(context.userId, {
+            name: data.name,
+            goal: data.goal,
+            scheduleKind: data.scheduleKind,
+            scheduleHour: data.scheduleHour,
+            scheduleDayOfWeek: data.scheduleDayOfWeek,
+            approvedTools: data.approvedTools,
+            nextRunAt: nextRunAt.toISOString(),
+          });
+          return inserted as AutomationRecord;
+        }
+      }
     } catch {
       // Supabase unavailable; fall through to local SQLite
     }
@@ -136,11 +152,9 @@ export const updateAutomation = createServerFn({ method: "POST" })
     if (Object.keys(patch).length === 0) return { ok: true };
 
     try {
-      const { error } = await context.supabase
-        .from("automations")
-        .update(patch)
-        .eq("id", automationId);
-      if (!error) return { ok: true };
+      if (context?.supabase && typeof context.supabase.from === "function") {
+        await context.supabase.from("automations").update(patch).eq("id", automationId);
+      }
     } catch {
       // Supabase unavailable; fall through to local SQLite
     }
@@ -154,11 +168,9 @@ export const deleteAutomation = createServerFn({ method: "POST" })
   .inputValidator((input: unknown) => z.object({ automationId: z.string().uuid() }).parse(input))
   .handler(async ({ data, context }): Promise<{ ok: true }> => {
     try {
-      const { error } = await context.supabase
-        .from("automations")
-        .delete()
-        .eq("id", data.automationId);
-      if (!error) return { ok: true };
+      if (context?.supabase && typeof context.supabase.from === "function") {
+        await context.supabase.from("automations").delete().eq("id", data.automationId);
+      }
     } catch {
       // Supabase unavailable; fall through to local SQLite
     }
@@ -172,13 +184,15 @@ export const listAutomationRuns = createServerFn({ method: "GET" })
   .inputValidator((input: unknown) => z.object({ automationId: z.string().uuid() }).parse(input))
   .handler(async ({ data, context }): Promise<AutomationRunRecord[]> => {
     try {
-      const { data: rows, error } = await context.supabase
-        .from("automation_runs")
-        .select("id,agent_run_id,status,summary,ran_at")
-        .eq("automation_id", data.automationId)
-        .order("ran_at", { ascending: false })
-        .limit(20);
-      if (!error && rows) return rows as AutomationRunRecord[];
+      if (context?.supabase && typeof context.supabase.from === "function") {
+        const { data: rows, error } = await context.supabase
+          .from("automation_runs")
+          .select("id,agent_run_id,status,summary,ran_at")
+          .eq("automation_id", data.automationId)
+          .order("ran_at", { ascending: false })
+          .limit(20);
+        if (!error && rows && rows.length > 0) return rows as AutomationRunRecord[];
+      }
     } catch {
       // Supabase unavailable; fall through to local SQLite
     }
@@ -202,14 +216,16 @@ export const runAutomationNow = createServerFn({ method: "POST" })
       enabled: boolean;
     } | null = null;
     try {
-      const { data: automation, error } = await context.supabase
-        .from("automations")
-        .select(
-          "id,user_id,name,goal,schedule_kind,schedule_hour,schedule_day_of_week,approved_tools,enabled",
-        )
-        .eq("id", data.automationId)
-        .single();
-      if (!error && automation) row = automation;
+      if (context?.supabase && typeof context.supabase.from === "function") {
+        const { data: automation, error } = await context.supabase
+          .from("automations")
+          .select(
+            "id,user_id,name,goal,schedule_kind,schedule_hour,schedule_day_of_week,approved_tools,enabled",
+          )
+          .eq("id", data.automationId)
+          .single();
+        if (!error && automation) row = automation;
+      }
     } catch {
       // Supabase unavailable; fall through to local SQLite
     }

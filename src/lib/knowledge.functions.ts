@@ -15,7 +15,7 @@ import {
   embedTexts,
   normaliseText,
   type RetrievedChunk,
-} from "./rag.server";
+} from "@/lib/rag.server";
 
 export type KnowledgeDocument = {
   id: string;

@@ -56,26 +56,41 @@ export function createLocalAutomation(
   data: {
     name: string;
     goal: string;
-    schedule_kind: "hourly" | "daily" | "weekly";
-    schedule_hour: number;
+    schedule_kind?: "hourly" | "daily" | "weekly";
+    scheduleKind?: "hourly" | "daily" | "weekly";
+    schedule_hour?: number;
+    scheduleHour?: number;
     schedule_day_of_week?: number | null;
+    scheduleDayOfWeek?: number | null;
     approved_tools?: string[];
+    approvedTools?: string[];
+    nextRunAt?: string;
+    next_run_at?: string;
   },
 ): AutomationRecord {
   const items = readStorage<AutomationRecord & { user_id: string }>(AUTOMATIONS_KEY);
   const now = new Date().toISOString();
+  const kind = data.scheduleKind ?? data.schedule_kind ?? "daily";
+  const hour = data.scheduleHour ?? data.schedule_hour ?? 9;
+  const dow =
+    data.scheduleDayOfWeek !== undefined
+      ? data.scheduleDayOfWeek
+      : (data.schedule_day_of_week ?? null);
+  const tools = data.approvedTools || data.approved_tools || [];
+  const nextRun = data.nextRunAt || data.next_run_at || now;
+
   const record: AutomationRecord & { user_id: string } = {
     id: generateId(),
     user_id: userId,
     name: data.name,
     goal: data.goal,
-    schedule_kind: data.schedule_kind,
-    schedule_hour: data.schedule_hour,
-    schedule_day_of_week: data.schedule_day_of_week ?? null,
-    approved_tools: data.approved_tools || [],
+    schedule_kind: kind,
+    schedule_hour: hour,
+    schedule_day_of_week: dow,
+    approved_tools: tools,
     enabled: true,
     last_run_at: null,
-    next_run_at: now,
+    next_run_at: nextRun,
     created_at: now,
   };
   items.unshift(record);
@@ -117,8 +132,9 @@ export function recordLocalAutomationRun(data: {
   automationId: string;
   userId: string;
   agentRunId?: string | null;
-  status: "success" | "partial" | "failed";
+  status: "success" | "partial" | "failed" | string;
   summary: string;
+  ranAt?: string;
 }): void {
   const runs = readStorage<AutomationRunRecord & { automation_id: string; user_id: string }>(
     AUTO_RUNS_KEY,
@@ -130,29 +146,48 @@ export function recordLocalAutomationRun(data: {
     agent_run_id: data.agentRunId || null,
     status: data.status,
     summary: data.summary,
-    ran_at: new Date().toISOString(),
+    ran_at: data.ranAt || new Date().toISOString(),
   });
   writeStorage(AUTO_RUNS_KEY, runs.slice(0, 100));
 }
 
 /* -------------------------------------------------------------------------- */
-/* Agent Runs CRUD                                                            */
+/* Agent Runs (Task History) CRUD                                             */
 /* -------------------------------------------------------------------------- */
 
 export function getLocalAgentRuns(
   userId: string,
-  options?: { search?: string; status?: string; limit?: number },
+  searchOrOptions?: string | { search?: string; status?: string; limit?: number },
+  status: string = "all",
+  limit: number = 30,
 ): AgentRunSummary[] {
-  const runs = readStorage<AgentRunSummary & { user_id?: string; goal?: string }>(AGENT_RUNS_KEY);
+  const runs = readStorage<AgentRunSummary & { user_id?: string; goal?: string; answer?: string }>(
+    AGENT_RUNS_KEY,
+  );
+
+  let searchStr = "";
+  let statusStr = status;
+  let limitNum = limit;
+
+  if (typeof searchOrOptions === "object" && searchOrOptions !== null) {
+    searchStr = typeof searchOrOptions.search === "string" ? searchOrOptions.search : "";
+    statusStr = searchOrOptions.status || status;
+    limitNum = searchOrOptions.limit ?? limit;
+  } else if (typeof searchOrOptions === "string") {
+    searchStr = searchOrOptions;
+  }
+
   let filtered = runs.filter((r) => !r.user_id || r.user_id === userId);
-  if (options?.status && options.status !== "all") {
-    filtered = filtered.filter((r) => r.status === options.status);
+  if (statusStr && statusStr !== "all") {
+    filtered = filtered.filter((r) => r.status === statusStr);
   }
-  if (options?.search) {
-    const q = options.search.toLowerCase();
-    filtered = filtered.filter((r) => (r.goal || "").toLowerCase().includes(q));
+  if (searchStr.trim()) {
+    const q = searchStr.trim().toLowerCase();
+    filtered = filtered.filter(
+      (r) => (r.goal || "").toLowerCase().includes(q) || (r.answer || "").toLowerCase().includes(q),
+    );
   }
-  return filtered.slice(0, options?.limit ?? 50);
+  return filtered.slice(0, limitNum);
 }
 
 export function getLocalAgentRun(runId: string): AgentRunDetail | null {
@@ -168,27 +203,32 @@ export function deleteLocalAgentRun(runId: string): void {
   );
 }
 
-export async function recordLocalAgentRun(userId: string, result: any): Promise<void> {
+export function recordLocalAgentRun(userId: string, data: any): void {
   const runs = readStorage<AgentRunDetail & { user_id: string }>(AGENT_RUNS_KEY);
   const now = new Date().toISOString();
+  const id = data.id || data.runId || generateId();
   const detail: AgentRunDetail & { user_id: string } = {
-    id: result.runId || generateId(),
+    id,
     user_id: userId,
-    goal: result.goal || "Agent Task",
-    status: result.status || "verified",
-    answer: result.answer || "",
-    verification_verdict: result.verification?.verdict || null,
-    verification_score: result.verification?.score ?? null,
-    step_count: result.steps?.length ?? 0,
-    failed_count: (result.steps || []).filter((s: any) => s.status === "failed").length,
-    plan: result.plan || { strategy: "", stepGoals: [], notes: [] },
-    steps: result.steps || [],
-    verification: result.verification || { verdict: "pass", score: 1, summary: "", checks: [] },
-    automation_id: null,
+    goal: data.goal || "Agent Task",
+    status: data.status || "verified",
+    answer: data.answer || "",
+    verification_verdict: data.verificationVerdict ?? data.verification?.verdict ?? null,
+    verification_score: data.verificationScore ?? data.verification?.score ?? null,
+    step_count: data.stepCount ?? data.step_count ?? data.steps?.length ?? 0,
+    failed_count:
+      data.failedCount ??
+      data.failed_count ??
+      (data.steps || []).filter((s: any) => s.status === "failed").length,
+    plan: data.plan || { strategy: "", stepGoals: [], notes: [] },
+    steps: data.steps || [],
+    verification: data.verification || { verdict: "pass", score: 1, summary: "", checks: [] },
+    automation_id: data.automationId ?? data.automation_id ?? null,
     created_at: now,
   };
-  runs.unshift(detail);
-  writeStorage(AGENT_RUNS_KEY, runs.slice(0, 50));
+  const filtered = runs.filter((r) => r.id !== id);
+  filtered.unshift(detail);
+  writeStorage(AGENT_RUNS_KEY, filtered.slice(0, 50));
 }
 
 /* -------------------------------------------------------------------------- */
@@ -197,20 +237,34 @@ export async function recordLocalAgentRun(userId: string, result: any): Promise<
 
 export function getLocalChatTurns(
   userId: string,
-  options?: { search?: string; limit?: number },
+  searchOrOptions?: string | { search?: string; limit?: number },
+  limit: number = 60,
 ): ChatTurnRecord[] {
-  const turns = readStorage<ChatTurnRecord & { user_id?: string }>(CHAT_TURNS_KEY);
-  let filtered = turns.filter((t) => !t.user_id || t.user_id === userId);
-  if (options?.search) {
-    const q = options.search.toLowerCase();
-    filtered = filtered.filter((t) => t.content.toLowerCase().includes(q));
+  const turns = readStorage<ChatTurnRecord & { user_id?: string; content?: string }>(
+    CHAT_TURNS_KEY,
+  );
+
+  let searchStr = "";
+  let limitNum = limit;
+
+  if (typeof searchOrOptions === "object" && searchOrOptions !== null) {
+    searchStr = typeof searchOrOptions.search === "string" ? searchOrOptions.search : "";
+    limitNum = searchOrOptions.limit ?? limit;
+  } else if (typeof searchOrOptions === "string") {
+    searchStr = searchOrOptions;
   }
-  return filtered.slice(0, options?.limit ?? 60);
+
+  let filtered = turns.filter((t) => !t.user_id || t.user_id === userId);
+  if (searchStr.trim()) {
+    const q = searchStr.trim().toLowerCase();
+    filtered = filtered.filter((t) => (t.content || "").toLowerCase().includes(q));
+  }
+  return filtered.slice(0, limitNum);
 }
 
 export function recordLocalChatTurn(
   userId: string,
-  data: { role: string; content: string; pageTitle?: string; pageUrl?: string },
+  data: { role: string; content: string; pageTitle?: string | null; pageUrl?: string | null },
 ): ChatTurnRecord {
   const turns = readStorage<ChatTurnRecord & { user_id: string }>(CHAT_TURNS_KEY);
   const record: ChatTurnRecord & { user_id: string } = {

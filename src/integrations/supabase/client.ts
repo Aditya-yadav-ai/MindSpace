@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
 // MindSpace Stage 8 — Client Supabase & Local Auth Fallback Bridge.
 import { createClient, type SupabaseClient, type Session } from "@supabase/supabase-js";
 import type { Database } from "./types";
@@ -58,35 +59,60 @@ function toSupabaseSession(session: MindSpaceSession | null): Session | null {
 }
 
 function createFallbackQueryBuilder(table: string) {
-  const result = { data: [] as unknown[], error: null, count: 0 };
-  const builder: Record<string, unknown> = {
-    table,
-    select: () => builder,
-    insert: (values: unknown) => ({
-      ...builder,
-      select: () =>
-        Promise.resolve({ data: Array.isArray(values) ? values : [values], error: null }),
-      then: (resolve: (arg: unknown) => unknown) =>
-        resolve({ data: Array.isArray(values) ? values : [values], error: null }),
-    }),
-    update: () => builder,
-    delete: () => builder,
-    eq: () => builder,
-    neq: () => builder,
-    gt: () => builder,
-    gte: () => builder,
-    lt: () => builder,
-    lte: () => builder,
-    in: () => builder,
-    order: () => builder,
-    limit: () => builder,
-    range: () => builder,
-    single: () => Promise.resolve({ data: null, error: null }),
-    maybeSingle: () => Promise.resolve({ data: null, error: null }),
-    then: (resolve: (arg: unknown) => unknown) => resolve(result),
-    catch: (reject: (arg: unknown) => unknown) => Promise.resolve(result).catch(reject),
+  const defaultResult = { data: [] as unknown[], error: null, count: 0 };
+  const createProxy = (
+    state: { data?: unknown; error?: unknown; count?: number } = defaultResult,
+  ): any => {
+    return new Proxy(
+      {},
+      {
+        get(_target, prop: string | symbol) {
+          if (prop === "table") return table;
+          if (prop === "then") {
+            return (resolve: (arg: unknown) => unknown) => resolve(state);
+          }
+          if (prop === "catch") {
+            return (reject: (arg: unknown) => unknown) => Promise.resolve(state).catch(reject);
+          }
+          if (prop === "single" || prop === "maybeSingle") {
+            return () => Promise.resolve({ data: null, error: null });
+          }
+          if (prop === "insert" || prop === "upsert") {
+            return (values: unknown) => {
+              const inserted = Array.isArray(values) ? values : [values];
+              const singleVal = Array.isArray(values) ? values[0] : values;
+              return new Proxy(
+                {},
+                {
+                  get(_itarget, iprop: string | symbol) {
+                    if (iprop === "select") {
+                      return () =>
+                        createProxy({ data: inserted, error: null, count: inserted.length });
+                    }
+                    if (iprop === "single" || iprop === "maybeSingle") {
+                      return () => Promise.resolve({ data: singleVal ?? null, error: null });
+                    }
+                    if (iprop === "then") {
+                      return (res: (arg: unknown) => unknown) =>
+                        res({ data: inserted, error: null });
+                    }
+                    if (iprop === "catch") {
+                      return (rej: (arg: unknown) => unknown) =>
+                        Promise.resolve({ data: inserted, error: null }).catch(rej);
+                    }
+                    return () => createProxy({ data: inserted, error: null });
+                  },
+                },
+              );
+            };
+          }
+          // Any chained query filter/modifier returns a fresh proxy
+          return (..._args: unknown[]) => createProxy(state);
+        },
+      },
+    );
   };
-  return builder;
+  return createProxy();
 }
 
 function createSupabaseFallback() {
