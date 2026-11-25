@@ -85,3 +85,5 @@ apps/api/mas/outputs/*.db-shm
 apps/api/mas/outputs/*.sqlite
 
 
+!.env.template
+.env.backup

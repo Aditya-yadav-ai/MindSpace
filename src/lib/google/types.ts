@@ -1,13 +1,19 @@
 /** Stage 5 — shared Google-integration types. No tokens ever appear here. */
 
 export type GoogleConnectionStatus =
-  | { connected: false }
+  | {
+      connected: false;
+      authorizedServices?: string[];
+      pendingServices?: string[];
+    }
   | {
       connected: true;
       googleEmail: string | null;
       scope: string[];
       connectedAt: string;
       expiresSoon: boolean;
+      authorizedServices?: string[];
+      pendingServices?: string[];
     };
 
 export type GmailMessageSummary = {

@@ -5,29 +5,24 @@
  */
 import { GoogleAuthError, type GoogleConnectionStatus } from "./types";
 export { GoogleAuthError };
+import {
+  SERVICE_SCOPES,
+  DEFAULT_WORKSPACE_SCOPES,
+  sanitizeScopesForGoogle,
+  isServiceAuthorized,
+  getAuthorizedServices,
+  getPendingServices,
+} from "./scopes";
+export {
+  SERVICE_SCOPES,
+  DEFAULT_WORKSPACE_SCOPES,
+  sanitizeScopesForGoogle,
+  isServiceAuthorized,
+  getAuthorizedServices,
+  getPendingServices,
+};
 
-export const GOOGLE_SCOPES = [
-  "openid",
-  "email",
-  "profile",
-  "https://www.googleapis.com/auth/gmail.readonly",
-  "https://www.googleapis.com/auth/gmail.compose",
-  "https://www.googleapis.com/auth/calendar.events",
-  "https://www.googleapis.com/auth/drive.file",
-  "https://www.googleapis.com/auth/documents",
-  "https://www.googleapis.com/auth/spreadsheets",
-  "https://www.googleapis.com/auth/presentations",
-  "https://www.googleapis.com/auth/meetings.space.created",
-  "https://www.googleapis.com/auth/meetings.space.readonly",
-  "https://www.googleapis.com/auth/forms.body",
-  "https://www.googleapis.com/auth/forms.responses.readonly",
-  "https://www.googleapis.com/auth/tasks",
-  "https://www.googleapis.com/auth/contacts",
-  "https://www.googleapis.com/auth/contacts.readonly",
-  "https://www.googleapis.com/auth/chat.spaces.readonly",
-  "https://www.googleapis.com/auth/chat.messages",
-  "https://www.googleapis.com/auth/chat.memberships.readonly",
-];
+export const GOOGLE_SCOPES = DEFAULT_WORKSPACE_SCOPES;
 
 const AUTH_URL = "https://accounts.google.com/o/oauth2/v2/auth";
 
@@ -60,7 +55,7 @@ export async function createAuthorizationUrl(
     // Local server not available; fall back to client construction
   }
 
-  // 2. Secondary fallback: Construct client-side authorization URL with configured environment variables
+  // 2. Secondary fallback: Construct client-side authorization URL with sanitized scopes
   const clientId =
     (typeof process !== "undefined" && process.env?.["GOOGLE_CLIENT_ID"]) ||
     "";
@@ -68,7 +63,8 @@ export async function createAuthorizationUrl(
     (typeof process !== "undefined" && process.env?.["GOOGLE_REDIRECT_URI"]) ||
     "http://localhost:8080/api/google/oauth-callback";
 
-  const requestedScopes = Array.from(new Set([...GOOGLE_SCOPES, ...(scopes || [])])).join(" ");
+  const sanitized = sanitizeScopesForGoogle(scopes);
+  const requestedScopes = sanitized.join(" ");
   const state = Math.random().toString(36).substring(2);
 
   const params = new URLSearchParams({
@@ -78,6 +74,7 @@ export async function createAuthorizationUrl(
     scope: requestedScopes,
     access_type: "offline",
     prompt: "consent",
+    include_granted_scopes: "true",
     state,
   });
 
@@ -97,6 +94,17 @@ export async function getConnectionStatus(userId: string): Promise<GoogleConnect
     if (res.ok) {
       const data = (await res.json()) as GoogleConnectionStatus;
       if (data && data.connected) {
+        const grantedScopes = Array.isArray(data.scope)
+          ? data.scope
+          : typeof data.scope === "string"
+            ? (data.scope as string).split(" ").filter(Boolean)
+            : [];
+        const result: GoogleConnectionStatus = {
+          ...data,
+          scope: grantedScopes,
+          authorizedServices: data.authorizedServices || getAuthorizedServices(grantedScopes),
+          pendingServices: data.pendingServices || getPendingServices(grantedScopes),
+        };
         // Cache in localStorage and chrome.storage.local for instantaneous offline access
         if (typeof localStorage !== "undefined") {
           try {
@@ -104,7 +112,7 @@ export async function getConnectionStatus(userId: string): Promise<GoogleConnect
             const conns = JSON.parse(raw);
             conns[userId] = {
               googleEmail: data.googleEmail,
-              scopes: data.scope,
+              scopes: grantedScopes,
               updatedAt: data.connectedAt || new Date().toISOString(),
             };
             conns["local-user"] = conns[userId];
@@ -119,12 +127,12 @@ export async function getConnectionStatus(userId: string): Promise<GoogleConnect
               "mindspace.auth.google_conn.v1": {
                 [userId]: {
                   googleEmail: data.googleEmail,
-                  scopes: data.scope,
+                  scopes: grantedScopes,
                   updatedAt: data.connectedAt || new Date().toISOString(),
                 },
                 "local-user": {
                   googleEmail: data.googleEmail,
-                  scopes: data.scope,
+                  scopes: grantedScopes,
                   updatedAt: data.connectedAt || new Date().toISOString(),
                 },
               },
@@ -133,7 +141,7 @@ export async function getConnectionStatus(userId: string): Promise<GoogleConnect
             /* ignore */
           }
         }
-        return data;
+        return result;
       }
     }
   } catch {
@@ -150,12 +158,20 @@ export async function getConnectionStatus(userId: string): Promise<GoogleConnect
         | { googleEmail?: string; scopes?: string[] | string; updatedAt?: string }
         | undefined;
       if (conn && conn.googleEmail) {
+        const grantedScopes =
+          typeof conn.scopes === "string"
+            ? conn.scopes.split(" ").filter(Boolean)
+            : Array.isArray(conn.scopes)
+              ? conn.scopes
+              : [];
         return {
           connected: true,
           googleEmail: conn.googleEmail,
-          scope: typeof conn.scopes === "string" ? conn.scopes.split(" ") : conn.scopes || [],
+          scope: grantedScopes,
           connectedAt: conn.updatedAt || new Date().toISOString(),
           expiresSoon: false,
+          authorizedServices: getAuthorizedServices(grantedScopes),
+          pendingServices: getPendingServices(grantedScopes),
         };
       }
     } catch {
@@ -174,12 +190,20 @@ export async function getConnectionStatus(userId: string): Promise<GoogleConnect
         | { googleEmail?: string; scopes?: string[] | string; updatedAt?: string }
         | undefined;
       if (conn && conn.googleEmail) {
+        const grantedScopes =
+          typeof conn.scopes === "string"
+            ? conn.scopes.split(" ").filter(Boolean)
+            : Array.isArray(conn.scopes)
+              ? conn.scopes
+              : [];
         return {
           connected: true,
           googleEmail: conn.googleEmail,
-          scope: typeof conn.scopes === "string" ? conn.scopes.split(" ") : conn.scopes || [],
+          scope: grantedScopes,
           connectedAt: conn.updatedAt || new Date().toISOString(),
           expiresSoon: false,
+          authorizedServices: getAuthorizedServices(grantedScopes),
+          pendingServices: getPendingServices(grantedScopes),
         };
       }
     } catch {
@@ -187,7 +211,11 @@ export async function getConnectionStatus(userId: string): Promise<GoogleConnect
     }
   }
 
-  return { connected: false };
+  return {
+    connected: false,
+    authorizedServices: [],
+    pendingServices: Object.keys(SERVICE_SCOPES),
+  };
 }
 
 export async function disconnectGoogle(userId: string): Promise<void> {
@@ -253,50 +281,69 @@ export function createTaskService(_userId?: string) {
   };
 }
 
-export function createGoogleServices(_userId?: string) {
-  const fail = () =>
-    Promise.reject(
-      new GoogleAuthError("Google account not connected in extension context.", "NOT_CONNECTED"),
-    );
+export function createGoogleServices(userId: string = "local-user") {
+  async function proxyTool<T>(action: string, input: unknown): Promise<T> {
+    try {
+      const res = await fetch("http://localhost:8080/api/google/oauth-callback", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ action, input, userId }),
+      });
+      const data = await res.json();
+      if (!res.ok || !data.ok) {
+        throw new Error(data.error || `Tool call failed for ${action}`);
+      }
+      return data.result as T;
+    } catch (err) {
+      if (err instanceof Error && (err.message.includes("fetch") || err.message.includes("Failed to fetch"))) {
+        throw new GoogleAuthError(
+          "Local MindSpace server on http://localhost:8080 is not running. Start the backend service to execute Google Workspace tools.",
+          "SERVER_OFFLINE",
+        );
+      }
+      throw err;
+    }
+  }
+
   return {
-    connected: false,
-    listRecentEmails: fail,
-    createEmailDraft: fail,
-    listUpcomingEvents: fail,
-    createCalendarEvent: fail,
-    searchDriveFiles: fail,
-    saveDriveFile: fail,
-    readDocument: fail,
-    createDocument: fail,
-    readSheetRange: fail,
-    createSpreadsheet: fail,
-    appendSheetValues: fail,
-    readPresentation: fail,
-    createPresentation: fail,
-    createMeetingSpace: fail,
-    getMeetingSpace: fail,
-    listConferenceRecords: fail,
-    listConferenceParticipants: fail,
-    createForm: fail,
-    getForm: fail,
-    getFormQuestions: fail,
-    listFormResponses: fail,
-    getFormResponseSummary: fail,
-    listTasks: fail,
-    createTask: fail,
-    completeTask: fail,
-    searchContacts: fail,
-    getContact: fail,
-    createContact: fail,
-    searchPlaces: fail,
-    getPlaceDetails: fail,
-    getDirections: fail,
-    searchYouTubeVideos: fail,
-    getYouTubeVideoDetails: fail,
-    listCourses: fail,
-    listCourseWork: fail,
-    listCourseSubmissions: fail,
-    listChatSpaces: fail,
-    sendChatMessage: fail,
+    connected: true,
+    listRecentEmails: (input: any) => proxyTool("gmail.list_recent", input),
+    createEmailDraft: (input: any) => proxyTool("gmail.create_draft", input),
+    listUpcomingEvents: (input: any) => proxyTool("calendar.list_events", input),
+    createCalendarEvent: (input: any) => proxyTool("calendar.create_event", input),
+    searchDriveFiles: (input: any) => proxyTool("drive.search", input),
+    saveDriveFile: (input: any) => proxyTool("drive.save_file", input),
+    readDocument: (input: any) => proxyTool("docs.read", input),
+    createDocument: (input: any) => proxyTool("docs.create", input),
+    readSheetRange: (input: any) => proxyTool("sheets.read", input),
+    createSpreadsheet: (input: any) => proxyTool("sheets.create", input),
+    appendSheetValues: (input: any) => proxyTool("sheets.append", input),
+    readPresentation: (input: any) => proxyTool("slides.read", input),
+    createPresentation: (input: any) => proxyTool("slides.create", input),
+    createMeetingSpace: (input: any) => proxyTool("meet.create_space", input),
+    getMeetingSpace: (input: any) => proxyTool("meet.get_space", input),
+    listConferenceRecords: (input: any) => proxyTool("meet.list_records", input),
+    listConferenceParticipants: (input: any) => proxyTool("meet.list_participants", input),
+    createForm: (input: any) => proxyTool("forms.create", input),
+    getForm: (input: any) => proxyTool("forms.get", input),
+    getFormQuestions: (input: any) => proxyTool("forms.questions", input),
+    listFormResponses: (input: any) => proxyTool("forms.responses", input),
+    getFormResponseSummary: (input: any) => proxyTool("forms.summary", input),
+    listTasks: (input: any) => proxyTool("tasks.list", input),
+    createTask: (input: any) => proxyTool("tasks.create", input),
+    completeTask: (input: any) => proxyTool("tasks.mark_done", input),
+    searchContacts: (input: any) => proxyTool("contacts.search", input),
+    getContact: (input: any) => proxyTool("contacts.get", input),
+    createContact: (input: any) => proxyTool("contacts.create", input),
+    searchPlaces: (input: any) => proxyTool("maps.places", input),
+    getPlaceDetails: (input: any) => proxyTool("maps.details", input),
+    getDirections: (input: any) => proxyTool("maps.directions", input),
+    searchYouTubeVideos: (input: any) => proxyTool("youtube.search", input),
+    getYouTubeVideoDetails: (input: any) => proxyTool("youtube.details", input),
+    listCourses: (input: any) => proxyTool("classroom.courses", input),
+    listCourseWork: (input: any) => proxyTool("classroom.coursework", input),
+    listCourseSubmissions: (input: any) => proxyTool("classroom.submissions", input),
+    listChatSpaces: (input: any) => proxyTool("chat.spaces", input),
+    sendChatMessage: (input: any) => proxyTool("chat.send", input),
   };
 }

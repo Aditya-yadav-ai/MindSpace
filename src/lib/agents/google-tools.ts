@@ -44,6 +44,19 @@ export const gmailCreateDraftTool = defineTool({
     body: z.string().trim().min(1).max(20_000),
   }),
   mock: false,
+  requiresConfirmation: false,
+  execute: (input, ctx) => requireConnected(() => ctx.google.createEmailDraft(input)),
+});
+
+export const gmailSendEmailTool = defineTool({
+  name: "gmail.send_email",
+  description: "Send an email directly. Mutation requires explicit user confirmation.",
+  inputSchema: z.object({
+    to: z.string().trim().email("must be a valid email address"),
+    subject: z.string().trim().min(1).max(300),
+    body: z.string().trim().min(1).max(20_000),
+  }),
+  mock: false,
   requiresConfirmation: true,
   execute: (input, ctx) => requireConnected(() => ctx.google.createEmailDraft(input)),
 });

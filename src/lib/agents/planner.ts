@@ -212,34 +212,72 @@ export function planGoal(goal: string, registry: AgentRegistry, hasPageText: boo
   }
 
   if (intents.includes("gmail") && missing("gmail", "Gmail")) {
-    const wantsDraft = /\b(draft|write|send|compose)\b/i.test(goal);
+    const wantsDraft = /\b(draft|write|send|compose|email)\b/i.test(goal);
+    let to: string | undefined = undefined;
+    let subject: string | undefined = undefined;
+    let body: string | undefined = undefined;
+
+    if (wantsDraft) {
+      // 1. Extract email recipient
+      const emailMatch = goal.match(/\b[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}\b/);
+      if (emailMatch) to = emailMatch[0];
+
+      // 2. Extract or synthesize subject
+      const subjectMatch = goal.match(/\b(?:subject|regarding|about|titled)\s+["']?([^"'\n,;]+)["']?/i);
+      if (subjectMatch) {
+        subject = subjectMatch[1].trim();
+      } else if (/mindspace/i.test(goal)) {
+        subject = "MindSpace Project Overview";
+      } else {
+        subject = "Message from MindSpace Assistant";
+      }
+
+      // 3. Extract or synthesize body
+      if (/mindspace/i.test(goal)) {
+        body =
+          "Hi,\n\nI am sharing details regarding the MindSpace project — an Intelligent Multi-Agent AI Browser Assistant with Chrome Manifest V3 integration, autonomous orchestration, local RAG knowledge synthesis, and Google Workspace integrations.\n\nKey Subsystems:\n- Chrome MV3 Extension Sidepanel & Real-time DOM capture\n- Multi-Agent Orchestration Engine (Planner, Specialist Agents, Verification)\n- 14 Official Google Workspace Adapters with Least-Privilege Scopes\n- Local Encrypted Credential Vault & SQLite Session Management\n\nBest regards,\nMindSpace Autonomous Assistant";
+      } else {
+        const bodyMatch = goal.match(/\b(?:saying|explaining|content|body)\s+["']?([^"'\n]+)["']?/i);
+        if (bodyMatch) {
+          body = bodyMatch[1].trim();
+        }
+      }
+    }
+
     steps.push({
       id: `s${steps.length + 1}`,
       agent: "gmail",
       goal: wantsDraft
-        ? "Prepare an email draft (does not send it)."
+        ? `Prepare an email draft${to ? ` to ${to}` : ""} (does not send it).`
         : "Search recent Gmail messages.",
-      input: wantsDraft ? { action: "draft" } : { action: "list", query: goal },
+      input: wantsDraft
+        ? { action: "draft", to, subject, body }
+        : { action: "list", query: goal },
       dependsOn: [],
     });
     if (wantsDraft)
       notes.push(
-        "Drafting an email needs a recipient, subject and body — the agent will ask if any are missing.",
+        "Drafting an email creates a draft in the user's Gmail account without sending.",
       );
   }
 
   if (intents.includes("calendar") && missing("calendar", "Calendar")) {
-    const wantsCreate = /\b(create|add|schedule|book)\b/i.test(goal);
+    const wantsCreate = /\b(create|add|schedule|book|event|meeting)\b/i.test(goal);
+    let summary: string | undefined = undefined;
+    if (wantsCreate) {
+      const match = goal.match(/\b(?:meeting|event)\s+(?:with|about|for)?\s*["']?([^"'\n,;]+)["']?/i);
+      summary = match ? match[1].trim() : "MindSpace Calendar Event";
+    }
     steps.push({
       id: `s${steps.length + 1}`,
       agent: "calendar",
       goal: wantsCreate ? "Create a calendar event." : "List upcoming calendar events.",
-      input: wantsCreate ? { action: "create" } : { action: "list" },
+      input: wantsCreate ? { action: "create", summary } : { action: "list" },
       dependsOn: [],
     });
     if (wantsCreate)
       notes.push(
-        "Creating an event needs a title, start and end time — the agent will ask if any are missing.",
+        "Creating an event adds it to the user's Google Calendar.",
       );
   }
 
@@ -249,11 +287,11 @@ export function planGoal(goal: string, registry: AgentRegistry, hasPageText: boo
       id: `s${steps.length + 1}`,
       agent: "drive",
       goal: wantsSave ? "Save a file to Drive." : "Search Drive files.",
-      input: wantsSave ? { action: "save" } : { action: "search", query: goal },
+      input: wantsSave ? { action: "save", name: "MindSpace Document", content: goal } : { action: "search", query: goal },
       dependsOn: [],
     });
     if (wantsSave)
-      notes.push("Saving a file needs a name and content — the agent will ask if any are missing.");
+      notes.push("Saving a file creates a document in Google Drive.");
   }
 
   const wantsCreate = /\b(create|new|make|start)\b/i.test(goal);

@@ -39,6 +39,9 @@ export const listAgentRuns = createServerFn({ method: "GET" })
   .middleware([requireSupabaseAuth])
   .inputValidator((input: unknown) => ListAgentRunsInput.parse(input ?? {}))
   .handler(async ({ data, context }): Promise<AgentRunSummary[]> => {
+    const search = typeof data?.search === "string" ? data.search : "";
+    const status = typeof data?.status === "string" ? data.status : "all";
+    const limit = typeof data?.limit === "number" ? data.limit : 30;
     try {
       if (context?.supabase && typeof context.supabase.from === "function") {
         let query = context.supabase
@@ -47,9 +50,9 @@ export const listAgentRuns = createServerFn({ method: "GET" })
             "id,goal,status,answer,verification_verdict,verification_score,step_count,failed_count,automation_id,created_at",
           )
           .order("created_at", { ascending: false })
-          .limit(data.limit);
-        if (data.status !== "all") query = query.eq("status", data.status);
-        if (data.search) query = query.ilike("goal", `%${data.search}%`);
+          .limit(limit);
+        if (status !== "all") query = query.eq("status", status);
+        if (search) query = query.ilike("goal", `%${search}%`);
         const { data: rows, error } = await query;
         if (!error && rows && rows.length > 0) return rows as AgentRunSummary[];
       }
@@ -57,7 +60,7 @@ export const listAgentRuns = createServerFn({ method: "GET" })
       // Supabase unavailable; fall through to local SQLite
     }
     const { getLocalAgentRuns } = await import("@/lib/local-db.server");
-    return getLocalAgentRuns(context.userId, data.search, data.status, data.limit);
+    return getLocalAgentRuns(context.userId, search, status, limit);
   });
 
 export const getAgentRun = createServerFn({ method: "GET" })
@@ -159,14 +162,16 @@ export const listChatHistory = createServerFn({ method: "GET" })
   .middleware([requireSupabaseAuth])
   .inputValidator((input: unknown) => ListChatHistoryInput.parse(input ?? {}))
   .handler(async ({ data, context }): Promise<ChatTurnRecord[]> => {
+    const search = typeof data?.search === "string" ? data.search : "";
+    const limit = typeof data?.limit === "number" ? data.limit : 60;
     try {
       if (context?.supabase && typeof context.supabase.from === "function") {
         let query = context.supabase
           .from("chat_turns")
           .select("id,role,content,page_title,page_url,created_at")
           .order("created_at", { ascending: false })
-          .limit(data.limit);
-        if (data.search) query = query.ilike("content", `%${data.search}%`);
+          .limit(limit);
+        if (search) query = query.ilike("content", `%${search}%`);
         const { data: rows, error } = await query;
         if (!error && rows && rows.length > 0) return rows as ChatTurnRecord[];
       }
@@ -174,7 +179,7 @@ export const listChatHistory = createServerFn({ method: "GET" })
       // Supabase unavailable; fall through to local SQLite
     }
     const { getLocalChatTurns } = await import("@/lib/local-db.server");
-    return getLocalChatTurns(context.userId, data.search, data.limit);
+    return getLocalChatTurns(context.userId, search, limit);
   });
 
 export const deleteChatTurn = createServerFn({ method: "POST" })

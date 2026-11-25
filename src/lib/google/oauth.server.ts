@@ -20,73 +20,72 @@ import {
   getLocalGoogleConnection,
   deleteLocalGoogleConnection,
 } from "../auth.server";
+import {
+  SERVICE_SCOPES,
+  DEFAULT_WORKSPACE_SCOPES,
+  sanitizeScopesForGoogle,
+  isServiceAuthorized,
+  getAuthorizedServices,
+  getPendingServices,
+} from "./scopes";
+
+export {
+  SERVICE_SCOPES,
+  DEFAULT_WORKSPACE_SCOPES,
+  sanitizeScopesForGoogle,
+  isServiceAuthorized,
+  getAuthorizedServices,
+  getPendingServices,
+};
 
 const AUTH_URL = "https://accounts.google.com/o/oauth2/v2/auth";
 const TOKEN_URL = "https://oauth2.googleapis.com/token";
 const REVOKE_URL = "https://oauth2.googleapis.com/revoke";
 const USERINFO_URL = "https://openidconnect.googleapis.com/v1/userinfo";
 
-/** Minimum scopes for all 14 official Google Workspace and Platform services. */
-export const GOOGLE_SCOPES = [
-  "openid",
-  "email",
-  "profile",
-  "https://www.googleapis.com/auth/gmail.readonly",
-  "https://www.googleapis.com/auth/gmail.compose",
-  "https://www.googleapis.com/auth/calendar.events",
-  "https://www.googleapis.com/auth/drive.file",
-  "https://www.googleapis.com/auth/documents",
-  "https://www.googleapis.com/auth/spreadsheets",
-  "https://www.googleapis.com/auth/presentations",
-  "https://www.googleapis.com/auth/meetings.space.created",
-  "https://www.googleapis.com/auth/meetings.space.readonly",
-  "https://www.googleapis.com/auth/forms.body",
-  "https://www.googleapis.com/auth/forms.responses.readonly",
-  "https://www.googleapis.com/auth/tasks",
-  "https://www.googleapis.com/auth/contacts",
-  "https://www.googleapis.com/auth/contacts.readonly",
-  "https://www.googleapis.com/auth/chat.spaces.readonly",
-  "https://www.googleapis.com/auth/chat.messages",
-  "https://www.googleapis.com/auth/chat.memberships.readonly",
-  "https://www.googleapis.com/auth/classroom.courses.readonly",
-  "https://www.googleapis.com/auth/classroom.coursework.me",
-  "https://www.googleapis.com/auth/classroom.announcements",
-  "https://www.googleapis.com/auth/youtube.readonly",
-  "https://www.googleapis.com/auth/youtube",
-] as const;
+/** Minimum default scopes for Google Workspace productivity suite. */
+export const GOOGLE_SCOPES = DEFAULT_WORKSPACE_SCOPES;
 
-export const SERVICE_SCOPE_MAPPING: Record<string, string[]> = {
-  gmail: ["gmail.readonly", "gmail.compose"],
-  calendar: ["calendar.events"],
-  drive: ["drive.file"],
-  docs: ["documents"],
-  sheets: ["spreadsheets"],
-  slides: ["presentations"],
-  meet: ["meetings.space.created", "meetings.space.readonly"],
-  forms: ["forms.body", "forms.responses.readonly"],
-  tasks: ["tasks"],
-  contacts: ["contacts", "contacts.readonly"],
-  chat: ["chat.spaces.readonly", "chat.messages", "chat.memberships.readonly"],
-  classroom: ["classroom.courses.readonly", "classroom.coursework.me", "classroom.announcements"],
-  youtube: ["youtube.readonly", "youtube"],
-  maps: [], // Backend API key authenticated
-};
+export const SERVICE_SCOPE_MAPPING: Record<string, readonly string[]> = SERVICE_SCOPES;
 
 /** Validates whether granted scopes cover a given service. */
 export function hasServiceScope(grantedScopes: string[], serviceId: string): boolean {
-  const required = SERVICE_SCOPE_MAPPING[serviceId];
-  if (!required || required.length === 0) return true;
-  return required.some((req) =>
-    grantedScopes.some((granted) => granted.includes(req) || req.includes(granted)),
-  );
+  return isServiceAuthorized(serviceId, grantedScopes);
 }
 
 const STATE_TTL_MS = 10 * 60 * 1000;
 
 function requireEnv(name: string): string {
-  const value = process.env[name];
-  if (!value) throw new Error(`Missing ${name}. Set it before using Google Sign-In.`);
-  return value;
+  if (!process.env[name]) {
+    try {
+      const fs = require("node:fs");
+      const path = require("node:path");
+      const candidatePaths = [
+        path.resolve(process.cwd(), ".env"),
+        path.resolve(__dirname, "../../../.env"),
+        path.resolve(__dirname, "../../.env"),
+      ];
+      for (const p of candidatePaths) {
+        if (fs.existsSync(p)) {
+          const content = fs.readFileSync(p, "utf8");
+          content.split(/\r?\n/).forEach((l: string) => {
+            const m = l.match(/^\s*([A-Za-z0-9_]+)\s*=\s*(.*)$/);
+            if (m && m[1] === name && !process.env[name]) {
+              process.env[name] = m[2].trim().replace(/^["']|["']$/g, "").trim();
+            }
+          });
+        }
+      }
+    } catch {
+      /* ignore */
+    }
+  }
+
+  const raw = process.env[name];
+  if (!raw) throw new Error(`Missing ${name}. Set it before using Google Sign-In.`);
+  const val = raw.trim().replace(/^["']|["']$/g, "").trim();
+  if (!val) throw new Error(`Empty ${name}. Set it before using Google Sign-In.`);
+  return val;
 }
 
 function base64url(buffer: Buffer) {
@@ -129,10 +128,7 @@ export async function createAuthorizationUrl(
   // Always keep in local auth store as resilient primary/fallback
   storeLocalOAuthState(state, userId, targetEmail, codeVerifier, expiresAt);
 
-  const scopesToRequest =
-    customScopes && customScopes.length > 0
-      ? Array.from(new Set(["openid", "email", "profile", ...customScopes]))
-      : GOOGLE_SCOPES;
+  const scopesToRequest = sanitizeScopesForGoogle(customScopes);
 
   const params = new URLSearchParams({
     client_id: clientId,
@@ -231,10 +227,34 @@ export async function completeAuthorization(code: string, state: string): Promis
 
   if (!response.ok) {
     const detail = await response.text().catch(() => "");
+    let errorJson: { error?: string; error_description?: string } = {};
+    try {
+      errorJson = JSON.parse(detail);
+    } catch {
+      /* non-json */
+    }
+
+    if (response.status === 401 || errorJson.error === "invalid_client") {
+      throw new Error(
+        `Google OAuth Error (401 invalid_client): The GOOGLE_CLIENT_SECRET configured in .env is invalid for client ID "${clientId}". Please update GOOGLE_CLIENT_SECRET in .env with the matching secret from Google Cloud Console.`,
+      );
+    }
+
     throw new Error(`Google rejected the sign-in (${response.status}). ${detail.slice(0, 300)}`);
   }
   const tokens = (await response.json()) as TokenResponse;
-  if (!tokens.refresh_token) {
+  const existingConn = getLocalGoogleConnection(stateRow.user_id);
+
+  let activeRefreshToken = tokens.refresh_token;
+  if (!activeRefreshToken && existingConn?.encrypted_refresh_token) {
+    try {
+      activeRefreshToken = decryptToken(existingConn.encrypted_refresh_token);
+    } catch {
+      // Ignore decrypt error
+    }
+  }
+
+  if (!activeRefreshToken) {
     throw new Error(
       "Google did not return a refresh token. Remove MindSpace's access at myaccount.google.com/permissions and try connecting again.",
     );
@@ -281,15 +301,20 @@ export async function completeAuthorization(code: string, state: string): Promis
 
   const userId = stateRow.user_id;
   const encryptedAccess = encryptToken(tokens.access_token);
-  const encryptedRefresh = encryptToken(tokens.refresh_token);
+  const encryptedRefresh = encryptToken(activeRefreshToken);
   const expiresAt = new Date(Date.now() + tokens.expires_in * 1000).toISOString();
+
+  // Merge newly granted scopes with previously accumulated scopes for this user
+  const previousScopes = existingConn?.scope ? existingConn.scope.split(" ").filter(Boolean) : [];
+  const newlyGrantedScopes = tokens.scope ? tokens.scope.split(" ").filter(Boolean) : [];
+  const accumulatedScopes = Array.from(new Set([...previousScopes, ...newlyGrantedScopes])).join(" ");
 
   // Save to local SQLite store
   saveLocalGoogleConnection(
     userId,
     googleEmail,
     googleProfile.sub || null,
-    tokens.scope,
+    accumulatedScopes,
     encryptedAccess,
     encryptedRefresh,
     expiresAt,
@@ -302,7 +327,7 @@ export async function completeAuthorization(code: string, state: string): Promis
       {
         user_id: userId,
         google_email: googleEmail,
-        scope: tokens.scope,
+        scope: accumulatedScopes,
         encrypted_access_token: encryptedAccess,
         encrypted_refresh_token: encryptedRefresh,
         access_token_expires_at: expiresAt,
@@ -339,6 +364,19 @@ async function refreshAccessToken(userId: string, refreshToken: string) {
   });
   if (!response.ok) {
     const detail = await response.text().catch(() => "");
+    let errorJson: { error?: string; error_description?: string } = {};
+    try {
+      errorJson = JSON.parse(detail);
+    } catch {
+      /* non-json */
+    }
+
+    if (response.status === 401 || errorJson.error === "invalid_client") {
+      throw new Error(
+        `Google OAuth Error (401 invalid_client): The GOOGLE_CLIENT_SECRET configured in .env is invalid for client ID "${clientId}". Please update GOOGLE_CLIENT_SECRET in .env with the matching secret from Google Cloud Console.`,
+      );
+    }
+
     throw new Error(
       `Could not refresh the Google connection (${response.status}). ${detail.slice(0, 300)}`,
     );
@@ -419,13 +457,16 @@ export async function getConnectionStatus(userId: string): Promise<GoogleConnect
   // Check local store first
   const localConn = getLocalGoogleConnection(userId);
   if (localConn) {
+    const grantedScopes = localConn.scope ? localConn.scope.split(" ").filter(Boolean) : [];
     return {
       connected: true,
       googleEmail: localConn.google_email,
-      scope: localConn.scope ? localConn.scope.split(" ").filter(Boolean) : [],
+      scope: grantedScopes,
       connectedAt: localConn.created_at,
       expiresSoon:
         new Date(localConn.access_token_expires_at).getTime() - EXPIRY_SKEW_MS <= Date.now(),
+      authorizedServices: getAuthorizedServices(grantedScopes),
+      pendingServices: getPendingServices(grantedScopes),
     };
   }
 
@@ -439,20 +480,27 @@ export async function getConnectionStatus(userId: string): Promise<GoogleConnect
       .maybeSingle();
 
     if (data) {
+      const grantedScopes = data.scope ? data.scope.split(" ").filter(Boolean) : [];
       return {
         connected: true,
         googleEmail: data.google_email,
-        scope: data.scope ? data.scope.split(" ").filter(Boolean) : [],
+        scope: grantedScopes,
         connectedAt: data.created_at,
         expiresSoon:
           new Date(data.access_token_expires_at).getTime() - EXPIRY_SKEW_MS <= Date.now(),
+        authorizedServices: getAuthorizedServices(grantedScopes),
+        pendingServices: getPendingServices(grantedScopes),
       };
     }
   } catch {
     // Supabase not available
   }
 
-  return { connected: false };
+  return {
+    connected: false,
+    authorizedServices: [],
+    pendingServices: Object.keys(SERVICE_SCOPES),
+  };
 }
 
 /** Revokes the token with Google (best-effort) and deletes the stored connection. */

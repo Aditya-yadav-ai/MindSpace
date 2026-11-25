@@ -144,7 +144,7 @@ export const GOOGLE_SERVICE_CAPABILITIES: ServiceCapability[] = [
     category: "productivity",
     reads: true,
     writes: true,
-    scopes: ["contacts", "contacts.readonly"],
+    scopes: ["contacts"],
     operations: [
       "List connections and contacts",
       "Search contacts by name or email",
@@ -192,8 +192,8 @@ export const GOOGLE_SERVICE_CAPABILITIES: ServiceCapability[] = [
     label: "YouTube",
     category: "education",
     reads: true,
-    writes: true,
-    scopes: ["youtube.readonly", "youtube"],
+    writes: false,
+    scopes: ["youtube.readonly"],
     operations: [
       "Search educational videos",
       "Retrieve video details and statistics",

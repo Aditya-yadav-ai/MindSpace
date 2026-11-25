@@ -976,6 +976,27 @@ export function AgentActivity({ signedIn, context }: { signedIn: boolean; contex
                           <p className="text-xs text-foreground/90 mt-0.5">{step.summary}</p>
                         </div>
 
+                        {((step as any).output?.draft || (step as any).output?.draftId || (step as any).output?.webUrl) && (
+                          <div className="mt-2 flex flex-wrap items-center gap-2 rounded-lg border border-emerald-500/20 bg-emerald-500/5 p-2.5 text-xs">
+                            <Mail className="size-4 text-emerald-500 shrink-0" />
+                            <span className="font-semibold text-emerald-600 dark:text-emerald-400">
+                              Draft Saved:
+                            </span>
+                            <span className="font-mono text-[11px] text-muted-foreground bg-muted/50 px-1.5 py-0.5 rounded">
+                              {(step as any).output?.draftId || (step as any).output?.draft?.draftId || "Gmail Draft"}
+                            </span>
+                            <a
+                              href={(step as any).output?.webUrl || (step as any).output?.draft?.webUrl || "https://mail.google.com/mail/u/0/#drafts"}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="ml-auto inline-flex items-center gap-1 rounded-md bg-primary px-2.5 py-1 text-[11px] font-semibold text-primary-foreground hover:bg-primary/90 transition-colors"
+                            >
+                              <span>Open in Gmail</span>
+                              <ExternalLink className="size-3" />
+                            </a>
+                          </div>
+                        )}
+
                         {step.error && (
                           <div className="rounded-lg border border-destructive/20 bg-destructive/10 p-2.5 text-xs text-destructive">
                             <p className="font-semibold">Execution Notice:</p>

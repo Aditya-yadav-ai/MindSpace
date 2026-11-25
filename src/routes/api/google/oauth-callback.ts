@@ -28,6 +28,97 @@ export const Route = createFileRoute("/api/google/oauth-callback")({
       OPTIONS: async () => {
         return new Response(null, { status: 204, headers: CORS_HEADERS });
       },
+      POST: async ({ request }) => {
+        try {
+          const body = (await request.json()) as {
+            action: string;
+            input: any;
+            userId?: string;
+          };
+          const { action, input, userId = "local-user" } = body;
+          const { createGoogleServices } = await import("@/lib/google/adapter.server");
+          const services = createGoogleServices(userId) as Record<string, Function>;
+
+          let result: unknown;
+          switch (action) {
+            case "gmail.create_draft":
+              result = await services.createEmailDraft(input);
+              break;
+            case "gmail.list_recent":
+              result = await services.listRecentEmails(input);
+              break;
+            case "calendar.create_event":
+              result = await services.createCalendarEvent(input);
+              break;
+            case "calendar.list_events":
+              result = await services.listUpcomingEvents(input);
+              break;
+            case "drive.save_file":
+              result = await services.saveDriveFile(input);
+              break;
+            case "drive.search":
+              result = await services.searchDriveFiles(input);
+              break;
+            case "docs.create":
+              result = await services.createDocument(input);
+              break;
+            case "docs.read":
+              result = await services.readDocument(input);
+              break;
+            case "sheets.create":
+              result = await services.createSpreadsheet(input);
+              break;
+            case "sheets.read":
+              result = await services.readSheetRange(input);
+              break;
+            case "sheets.append":
+              result = await services.appendSheetValues(input);
+              break;
+            case "tasks.create":
+              result = await services.createTask(input);
+              break;
+            case "tasks.list":
+              result = await services.listTasks(input);
+              break;
+            case "tasks.mark_done":
+              result = await services.markTaskDone(input);
+              break;
+            case "contacts.search":
+              result = await services.searchContacts(input);
+              break;
+            case "contacts.create":
+              result = await services.createContact(input);
+              break;
+            case "meet.create_space":
+              result = await services.createMeetingSpace(input);
+              break;
+            case "maps.directions":
+              result = await services.getDirections(input);
+              break;
+            case "maps.places":
+              result = await services.searchPlaces(input);
+              break;
+            case "youtube.search":
+              result = await services.searchVideos(input);
+              break;
+            default:
+              if (typeof services[action] === "function") {
+                result = await services[action](input);
+              } else {
+                throw new Error(`Unsupported tool action: ${action}`);
+              }
+          }
+          return new Response(JSON.stringify({ ok: true, result }), {
+            status: 200,
+            headers: { "Content-Type": "application/json", ...CORS_HEADERS },
+          });
+        } catch (err) {
+          return new Response(
+            JSON.stringify({ ok: false, error: err instanceof Error ? err.message : String(err) }),
+            { status: 500, headers: { "Content-Type": "application/json", ...CORS_HEADERS } },
+          );
+        }
+      },
       GET: async ({ request }) => {
         const url = new URL(request.url);
         const action = url.searchParams.get("action");

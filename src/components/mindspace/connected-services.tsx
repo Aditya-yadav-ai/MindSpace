@@ -214,22 +214,27 @@ export function ConnectedServices({
       </div>
 
       <div className="mt-4 grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-7 gap-1.5 text-center text-[10.5px] text-muted-foreground">
-        {GOOGLE_SERVICE_CAPABILITIES.map((service) => (
-          <div key={service.id} className="rounded-md bg-background p-2 ring-1 ring-border">
-            <p className="truncate font-medium text-foreground/70">{service.label}</p>
-            <p
-              className={cn(
-                "mt-1 font-medium",
-                connected ? "text-positive" : "text-muted-foreground",
-              )}
-            >
-              {connected ? "ready" : "offline"}
-            </p>
-            <p className="mt-0.5 text-muted-foreground">
-              {service.writes ? (service.reads ? "read/write" : "write") : "read-only"}
-            </p>
-          </div>
-        ))}
+        {GOOGLE_SERVICE_CAPABILITIES.map((service) => {
+          const isReady =
+            service.requiresApiKey ||
+            (connected && Boolean(status?.authorizedServices?.includes(service.id)));
+          return (
+            <div key={service.id} className="rounded-md bg-background p-2 ring-1 ring-border">
+              <p className="truncate font-medium text-foreground/70">{service.label}</p>
+              <p
+                className={cn(
+                  "mt-1 font-medium",
+                  isReady ? "text-positive" : "text-muted-foreground",
+                )}
+              >
+                {isReady ? "ready" : "offline"}
+              </p>
+              <p className="mt-0.5 text-muted-foreground">
+                {service.writes ? (service.reads ? "read/write" : "write") : "read-only"}
+              </p>
+            </div>
+          );
+        })}
       </div>
     </div>
   );

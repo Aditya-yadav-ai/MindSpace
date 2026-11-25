@@ -228,7 +228,11 @@ export function ConnectedAccountsView({
       {/* 14 Services Grid */}
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
         {filteredServices.map((service) => {
-          const serviceActive = isConnected || service.requiresApiKey;
+          const authorizedServices = connectionStatus?.connected
+            ? connectionStatus.authorizedServices || []
+            : [];
+          const serviceActive =
+            service.requiresApiKey || authorizedServices.includes(service.id);
           const isWriting = service.writes;
           const isLoading = loadingService === service.id;
 
@@ -262,8 +266,8 @@ export function ConnectedAccountsView({
                       {service.requiresApiKey
                         ? "API Key Managed"
                         : serviceActive
-                          ? "Connected"
-                          : "Not Connected"}
+                          ? "Authorized"
+                          : "Needs Authorization"}
                     </span>
                     <span
                       className={`text-[9px] font-medium uppercase ${
